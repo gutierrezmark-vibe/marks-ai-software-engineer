@@ -1,335 +1,629 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bond Stepped Fretboard — Profile Tool</title>
+<title>Stepboard — Bond-Style Fretboard Designer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
-
+  :root, :root[data-theme="dark"]{
+    --bg:#0a0c0f;
+    --bg-glow:rgba(242,183,102,.07);
+    --panel:#12161b;
+    --panel-2:#181d24;
+    --panel-3:#1f262e;
+    --line:#252d37;
+    --line-soft:#1b2129;
+    --ink:#eaeef2;
+    --ink-2:#a3aeba;
+    --ink-3:#6a7683;
+    --accent:#f2b766;
+    --accent-2:#ffd08f;
+    --accent-ink:#1d1406;
+    --accent-soft:rgba(242,183,102,.14);
+    --teal:#5fd6d0;
+    --teal-soft:rgba(95,214,208,.14);
+    --rose:#ff7d7d;
+    --rose-soft:rgba(255,125,125,.12);
+    --green:#7fe0a3;
+    --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 12px 32px rgba(0,0,0,.35);
+    --viewer-a:#1a2028;
+    --viewer-b:#0c0f13;
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f0ea;
+    --bg-glow:rgba(183,121,31,.08);
+    --panel:#ffffff;
+    --panel-2:#f8f6f2;
+    --panel-3:#efebe4;
+    --line:#e2dcd2;
+    --line-soft:#ece7df;
+    --ink:#1b1e22;
+    --ink-2:#555c64;
+    --ink-3:#8b9197;
+    --accent:#b5761c;
+    --accent-2:#94600f;
+    --accent-ink:#ffffff;
+    --accent-soft:rgba(181,118,28,.12);
+    --teal:#108983;
+    --teal-soft:rgba(16,137,131,.10);
+    --rose:#d64545;
+    --rose-soft:rgba(214,69,69,.08);
+    --green:#1f9a57;
+    --shadow:0 1px 2px rgba(40,30,10,.05), 0 10px 28px rgba(40,30,10,.07);
+    --viewer-a:#fbfaf7;
+    --viewer-b:#e9e4da;
+  }
   :root{
-    --bg:        #0c141c;
-    --panel:     #121e29;
-    --panel-2:   #0f1922;
-    --line:      #223140;
-    --line-soft: #1a2733;
-    --ink:       #dbe6ee;
-    --ink-dim:   #7d93a3;
-    --ink-faint: #4c6070;
-    --cyan:      #5fe3e0;
-    --amber:     #ffb454;
-    --green:     #7ee787;
-    --red:       #ff6b6b;
-    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    --disp: 'Space Grotesk', var(--mono);
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:'Space Grotesk', system-ui, -apple-system, sans-serif;
+    --r:12px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background:
-      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0/32px 32px,
-      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0/32px 32px,
-      var(--bg);
+    background:radial-gradient(1200px 600px at 70% -10%, var(--bg-glow), transparent 60%), var(--bg);
     color:var(--ink);
-    font-family:var(--mono);
-    font-size:13px;
+    font-family:var(--sans);
+    font-size:14px;
     min-height:100vh;
+    -webkit-font-smoothing:antialiased;
   }
-  header{
-    padding:22px 28px 16px;
+  button{font-family:inherit;}
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:12px 22px;
+    background:color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     border-bottom:1px solid var(--line);
-    display:flex;
-    align-items:baseline;
-    gap:16px;
-    flex-wrap:wrap;
   }
-  header h1{
-    font-family:var(--disp);
-    font-size:20px;
-    font-weight:700;
-    margin:0;
-    letter-spacing:.2px;
-    color:var(--ink);
-  }
-  header h1 span{color:var(--cyan);}
-  header p{
-    margin:0;
-    color:var(--ink-dim);
-    font-size:12px;
-    letter-spacing:.3px;
-  }
-  .wrap{
-    display:grid;
-    grid-template-columns:340px 1fr;
-    gap:1px;
-    background:var(--line);
-    min-height:calc(100vh - 78px);
-  }
-  @media (max-width:900px){ .wrap{grid-template-columns:1fr;} }
+  .brand{display:flex; align-items:center; gap:11px; margin-right:auto; min-width:0;}
+  .brand svg{flex:none;}
+  .brand h1{font-size:17px; font-weight:700; margin:0; letter-spacing:.2px; white-space:nowrap;}
+  .brand h1 span{color:var(--accent);}
+  .brand p{margin:1px 0 0; font-size:12px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .bar-tools{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
 
-  .panel{background:var(--panel);}
-  .form{padding:18px 20px 40px; overflow-y:auto;}
+  .seg{display:inline-flex; background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:3px; gap:2px;}
+  .seg button{
+    border:0; background:transparent; color:var(--ink-2);
+    font-size:12.5px; font-weight:600; letter-spacing:.3px;
+    padding:6px 12px; border-radius:6px; cursor:pointer; transition:background .15s, color .15s;
+  }
+  .seg button:hover{color:var(--ink);}
+  .seg button[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink);}
+  .seg.full{display:flex;} .seg.full button{flex:1;}
 
-  .group{margin-bottom:22px;}
-  .group-title{
-    font-family:var(--disp);
-    font-size:11px;
-    font-weight:600;
-    letter-spacing:1.6px;
-    text-transform:uppercase;
-    color:var(--cyan);
-    margin:0 0 10px;
-    padding-bottom:6px;
-    border-bottom:1px dashed var(--line);
+  .select, select{
+    appearance:none; -webkit-appearance:none;
+    background:var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23889' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+    border:1px solid var(--line); color:var(--ink);
+    font-family:var(--sans); font-size:13px; font-weight:500;
+    padding:7px 30px 7px 11px; border-radius:9px; cursor:pointer; outline:none;
   }
-  label.field{display:block; margin-bottom:10px;}
-  label.field .l{
-    display:flex; justify-content:space-between; align-items:baseline;
-    font-size:11.5px; color:var(--ink-dim); margin-bottom:4px;
+  select:focus-visible{border-color:var(--accent);}
+  .icon-btn{
+    width:34px; height:34px; display:grid; place-items:center;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink-2);
+    border-radius:9px; cursor:pointer;
   }
-  label.field .l .u{color:var(--ink-faint); font-size:10.5px;}
-  input[type=number], select{
-    width:100%;
-    background:var(--panel-2);
-    border:1px solid var(--line);
-    color:var(--ink);
-    font-family:var(--mono);
-    font-size:13px;
-    padding:7px 8px;
-    border-radius:3px;
-    outline:none;
+  .icon-btn:hover{color:var(--ink); border-color:var(--ink-3);}
+
+  /* ---------- layout ---------- */
+  .layout{display:grid; grid-template-columns:372px minmax(0,1fr); gap:18px; padding:18px 22px 40px; max-width:1680px; margin:0 auto;}
+  @media (max-width:1000px){ .layout{grid-template-columns:1fr; padding:14px 16px 32px;} }
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow);}
+
+  /* ---------- sidebar controls ---------- */
+  .sidebar{display:flex; flex-direction:column; gap:12px; align-self:start;}
+  @media (min-width:1001px){ .sidebar{position:sticky; top:76px; max-height:calc(100vh - 92px); overflow-y:auto; padding-right:4px; scrollbar-width:thin;} }
+
+  details.sec{padding:0;}
+  details.sec > summary{
+    list-style:none; cursor:pointer; user-select:none;
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px;
+    font-weight:600; font-size:14px;
   }
-  input[type=number]:focus, select:focus{border-color:var(--cyan);}
-  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .toggle-row{display:flex; gap:8px; margin-bottom:14px;}
-  .toggle-btn{
-    flex:1; text-align:center; padding:7px 6px;
-    background:var(--panel-2); border:1px solid var(--line); color:var(--ink-dim);
-    font-family:var(--mono); font-size:11.5px; letter-spacing:.5px;
-    border-radius:3px; cursor:pointer; user-select:none;
+  details.sec > summary::-webkit-details-marker{display:none;}
+  .sec-ico{width:26px; height:26px; border-radius:7px; display:grid; place-items:center; background:var(--accent-soft); color:var(--accent); flex:none;}
+  .sec-sub{margin-left:auto; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.3px;}
+  .chev{transition:transform .2s; color:var(--ink-3);}
+  details.sec[open] .chev{transform:rotate(180deg);}
+  .sec-body{padding:2px 16px 16px; display:flex; flex-direction:column; gap:14px;}
+
+  .ctl-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; font-size:12.5px; color:var(--ink-2); font-weight:500;}
+  .ctl-head .u{font-family:var(--mono); font-size:11px; color:var(--ink-3);}
+  .ctl-row{display:grid; grid-template-columns:1fr 96px; gap:10px; align-items:center;}
+  .ctl-row input[type=number]{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--ink);
+    font-family:var(--mono); font-size:13px; padding:7px 9px; border-radius:8px; outline:none; text-align:right;
   }
-  .toggle-btn.active{ color:var(--bg); background:var(--cyan); border-color:var(--cyan); font-weight:600; }
-  .hint{font-size:10.5px; color:var(--ink-faint); margin-top:2px; line-height:1.55;}
-  .readout{background:var(--panel-2); border:1px solid var(--line); border-radius:4px; padding:10px 12px; margin-top:6px;}
-  .readout .r{display:flex; justify-content:space-between; font-size:11.5px; padding:3px 0; color:var(--ink-dim);}
-  .readout .r b{color:var(--cyan); font-weight:600;}
-  .readout .r.warn b{color:var(--red);}
+  .ctl-row input[type=number]:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+  .ctl-warn{font-size:11.5px; color:var(--rose); margin-top:6px;}
+  .ctl-warn:empty{display:none;}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .two .ctl-row{grid-template-columns:1fr;}
+  .two .ctl-row input[type=range]{display:none;}
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:22px; background:transparent; cursor:pointer; margin:0;
+    --p:50%;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:4px; border-radius:4px;
+    background:linear-gradient(90deg, var(--accent) 0 var(--p), var(--panel-3) var(--p) 100%);
+  }
+  input[type=range]::-moz-range-track{height:4px; border-radius:4px; background:var(--panel-3);}
+  input[type=range]::-moz-range-progress{height:4px; border-radius:4px; background:var(--accent);}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%; margin-top:-6px;
+    background:var(--panel); border:2px solid var(--accent); box-shadow:0 1px 4px rgba(0,0,0,.3);
+    transition:transform .1s;
+  }
+  input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; background:var(--panel); border:2px solid var(--accent);}
+  input[type=range]:active::-webkit-slider-thumb{transform:scale(1.2);}
+  input[type=range]:focus-visible{outline:none;}
+  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px var(--accent-soft);}
+
+  .field-label{font-size:12.5px; color:var(--ink-2); font-weight:500; margin-bottom:7px;}
+  .full-select{width:100%;}
+  .help{
+    font-size:12px; line-height:1.6; color:var(--ink-3);
+    background:var(--panel-2); border:1px solid var(--line-soft); border-radius:9px; padding:10px 12px;
+  }
+  .help b{color:var(--ink-2); font-weight:600;}
+  .help-toggle{
+    align-self:flex-start; border:0; background:none; padding:0; cursor:pointer;
+    color:var(--ink-3); font-size:12px; display:inline-flex; align-items:center; gap:6px;
+  }
+  .help-toggle:hover{color:var(--accent);}
   .hidden{display:none !important;}
 
-  .main{padding:20px 24px 40px;}
-  .viewhead{display:flex; justify-content:space-between; align-items:center; margin:0 0 8px; flex-wrap:wrap; gap:8px;}
-  .viewhead h2{font-family:var(--disp); font-size:13px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; color:var(--ink); margin:0;}
-  .viewhead h2 small{color:var(--ink-faint); font-weight:400; text-transform:none; letter-spacing:0;}
-  .btns{display:flex; gap:8px; flex-wrap:wrap;}
-  button.dl{
-    background:transparent; border:1px solid var(--line); color:var(--ink-dim);
-    font-family:var(--mono); font-size:11px; letter-spacing:.4px;
-    padding:6px 10px; border-radius:3px; cursor:pointer;
-  }
-  button.dl:hover{border-color:var(--cyan); color:var(--cyan);}
-  button.dl.primary{border-color:var(--amber); color:var(--amber);}
-  button.dl.primary:hover{background:var(--amber); color:var(--bg);}
-  button.dl.solid{border-color:var(--green); color:var(--green);}
-  button.dl.solid:hover{background:var(--green); color:var(--bg);}
-  button.dl:disabled{opacity:.32; cursor:not-allowed; border-color:var(--line); color:var(--ink-faint);}
-  button.dl:disabled:hover{border-color:var(--line); color:var(--ink-faint); background:transparent;}
+  .mini-read{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .mini-read div{background:var(--panel-2); border:1px solid var(--line-soft); border-radius:9px; padding:8px 10px;}
+  .mini-read span{display:block; font-size:11px; color:var(--ink-3); margin-bottom:2px;}
+  .mini-read b{font-family:var(--mono); font-size:13px; font-weight:600; color:var(--ink);}
+  .mini-read .warn b{color:var(--rose);}
+  .alert{font-size:12px; line-height:1.5; color:var(--rose); background:var(--rose-soft); border:1px solid color-mix(in srgb, var(--rose) 30%, transparent); padding:9px 11px; border-radius:9px;}
 
-  .legend{display:flex; gap:16px; font-size:10.5px; color:var(--ink-faint); margin:0 0 8px; flex-wrap:wrap;}
-  .legend .sw{display:inline-block; width:14px; height:3px; margin-right:5px; vertical-align:middle; border-radius:2px;}
+  /* ---------- main column ---------- */
+  .main{display:flex; flex-direction:column; gap:18px; min-width:0;}
 
-  .viewbox{
-    background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
-    padding:10px; margin-bottom:16px; overflow:auto;
-  }
-  .viewbox svg{width:100%; height:auto; display:block;}
+  .stats{display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:12px;}
+  @media (max-width:1300px){ .stats{grid-template-columns:repeat(3, minmax(0,1fr));} }
+  @media (max-width:560px){ .stats{grid-template-columns:repeat(2, minmax(0,1fr));} }
+  .stat{padding:13px 15px; min-width:0;}
+  .stat .k{font-size:11.5px; color:var(--ink-3); font-weight:500; letter-spacing:.3px; display:flex; align-items:center; gap:6px;}
+  .stat .v{font-family:var(--mono); font-size:19px; font-weight:600; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .stat .v small{font-size:12px; color:var(--ink-3); font-weight:500; margin-left:3px;}
+  .stat .s{font-size:11.5px; color:var(--ink-3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .stat.accent .v{color:var(--accent);}
+  .stat select{font-size:12px; padding:3px 24px 3px 8px; border-radius:7px; margin-top:6px; max-width:100%; background-position:right 8px center;}
 
-  details.fretTable{
-    background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:10px 14px;
+  .viewer{overflow:hidden;}
+  .viewer-bar{display:flex; align-items:center; gap:12px; padding:11px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .tabs{display:inline-flex; gap:2px; background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:3px;}
+  .tabs button{border:0; background:none; color:var(--ink-2); font-size:13px; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer; display:inline-flex; gap:7px; align-items:center;}
+  .tabs button[aria-selected="true"]{background:var(--panel); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  .viewer-tools{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .exag{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-3);}
+  .exag input{width:110px;}
+  .exag b{font-family:var(--mono); color:var(--ink-2); font-weight:600; min-width:28px;}
+  .pill-btn{
+    border:1px solid var(--line); background:var(--panel-2); color:var(--ink-2);
+    font-size:12px; font-weight:600; padding:6px 11px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
   }
-  details.fretTable summary{
-    cursor:pointer; color:var(--cyan); font-size:11.5px;
-    letter-spacing:.5px; text-transform:uppercase; font-weight:600; outline:none;
-  }
-  table{width:100%; border-collapse:collapse; margin-top:10px; font-size:11.5px;}
-  th,td{text-align:right; padding:4px 8px; border-bottom:1px solid var(--line-soft); color:var(--ink-dim);}
-  th{color:var(--ink-faint); font-weight:500; text-transform:uppercase; font-size:10px; letter-spacing:.5px;}
-  td:first-child, th:first-child{text-align:left; color:var(--ink);}
-  tr:hover td{color:var(--ink);}
+  .pill-btn:hover{color:var(--ink); border-color:var(--ink-3);}
+  .pill-btn[aria-pressed="true"]{color:var(--accent); border-color:color-mix(in srgb, var(--accent) 50%, transparent); background:var(--accent-soft);}
 
-  .footnote{
-    margin-top:18px; font-size:10.5px; color:var(--ink-faint); line-height:1.6;
-    border-top:1px dashed var(--line); padding-top:12px;
+  .stage{position:relative; height:440px; background:radial-gradient(ellipse at 50% 30%, var(--viewer-a), var(--viewer-b));}
+  @media (max-width:700px){ .stage{height:340px;} }
+  .pane{position:absolute; inset:0;}
+  #glCanvas{width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
+  #glCanvas:active{cursor:grabbing;}
+  .stage-hint{position:absolute; left:14px; bottom:12px; font-size:11.5px; color:var(--ink-3); pointer-events:none;}
+  .stage-badge{position:absolute; right:14px; bottom:12px; font-size:11px; color:var(--ink-3); background:color-mix(in srgb, var(--panel) 70%, transparent); border:1px solid var(--line); padding:4px 9px; border-radius:20px; pointer-events:none;}
+  .gl-fallback{position:absolute; inset:0; display:grid; place-items:center; text-align:center; color:var(--ink-3); font-size:13px; padding:20px;}
+
+  #profilePane{display:flex; flex-direction:column; justify-content:center; padding:18px 18px 34px;}
+  #profileSVG{width:100%; display:block; overflow:visible;}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); padding:0 4px 12px;}
+  .legend i{display:inline-block; width:14px; height:4px; border-radius:2px; margin-right:7px; vertical-align:middle;}
+  .tip{
+    position:absolute; pointer-events:none; z-index:5;
+    background:var(--panel); border:1px solid var(--line); box-shadow:var(--shadow);
+    border-radius:9px; padding:8px 11px; font-size:12px; line-height:1.55; white-space:nowrap;
+    transform:translate(-50%, calc(-100% - 12px)); opacity:0; transition:opacity .12s;
   }
-  .statusbar{
-    margin-top:10px; font-size:10.5px; line-height:1.6; color:var(--ink-faint);
-    background:var(--panel-2); border:1px solid var(--line); border-radius:4px;
-    padding:8px 12px; min-height:32px;
+  .tip.on{opacity:1;}
+  .tip b{color:var(--accent);}
+  .tip .num{color:var(--ink-2);}
+
+  #tablePane{overflow:auto; padding:6px 18px 18px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  thead th{position:sticky; top:0; background:var(--viewer-a); z-index:1;}
+  th,td{text-align:right; padding:8px 10px; border-bottom:1px solid var(--line-soft); font-family:var(--mono);}
+  th{color:var(--ink-3); font-weight:500; font-family:var(--sans); font-size:11.5px; letter-spacing:.3px;}
+  td{color:var(--ink-2);}
+  td:first-child, th:first-child{text-align:left;}
+  td:first-child{color:var(--ink); font-weight:600;}
+  tbody tr:hover td{background:var(--accent-soft); color:var(--ink);}
+  tr.perp td{color:var(--accent);}
+  .table-tools{display:flex; justify-content:flex-end; padding:12px 0 6px;}
+
+  /* ---------- export ---------- */
+  .export{padding:16px;}
+  .export-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  .export-head h2{margin:0; font-size:15px; font-weight:600;}
+  .export-head p{margin:0; font-size:12px; color:var(--ink-3);}
+  .tiles{display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:12px;}
+  @media (max-width:1300px){ .tiles{grid-template-columns:repeat(3, minmax(0,1fr));} }
+  @media (max-width:640px){ .tiles{grid-template-columns:1fr 1fr;} }
+  @media (max-width:420px){ .tiles{grid-template-columns:1fr;} }
+  .tile{
+    position:relative; display:flex; flex-direction:column; gap:6px;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:11px; padding:14px;
+    transition:border-color .15s, transform .15s;
   }
-  .statusbar b{color:var(--green); font-weight:600;}
-  .statusbar.bad b{color:var(--red);}
+  .tile:hover{border-color:var(--ink-3);}
+  .tile.rec{border-color:color-mix(in srgb, var(--accent) 55%, transparent); background:linear-gradient(180deg, var(--accent-soft), var(--panel-2) 70%);}
+  .tile .fmt{font-family:var(--mono); font-size:18px; font-weight:600; letter-spacing:.5px;}
+  .tile.rec .fmt{color:var(--accent);}
+  .tile .tag{position:absolute; top:12px; right:12px; font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--accent-ink); background:var(--accent); padding:3px 7px; border-radius:20px;}
+  .tile .desc{font-size:12px; color:var(--ink-3); line-height:1.5; flex:1;}
+  .tile .acts{display:flex; gap:6px; margin-top:6px;}
+  .dl{
+    flex:1; border:1px solid var(--line); background:var(--panel); color:var(--ink);
+    font-size:12.5px; font-weight:600; padding:8px 10px; border-radius:8px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:all .15s;
+  }
+  .dl:hover{border-color:var(--accent); color:var(--accent);}
+  .tile.rec .dl{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
+  .tile.rec .dl:hover{filter:brightness(1.08);}
+  .dl:disabled{opacity:.4; cursor:not-allowed;}
+  .dl:disabled:hover{border-color:var(--line); color:var(--ink);}
+  .tile.off{opacity:.55;}
+  .statusbar{margin-top:14px; font-size:12px; line-height:1.6; color:var(--ink-3); background:var(--panel-2); border:1px solid var(--line-soft); border-radius:9px; padding:10px 13px; display:flex; gap:10px; align-items:flex-start;}
+  .statusbar .dot{flex:none; width:8px; height:8px; border-radius:50%; background:var(--green); margin-top:6px; box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent);}
+  .statusbar b{color:var(--ink-2); font-weight:600;}
+  .statusbar.bad .dot{background:var(--rose); box-shadow:0 0 0 3px var(--rose-soft);}
+
+  /* ---------- build sheet ---------- */
+  .sheet{padding:16px;}
+  .sheet h2{margin:0 0 12px; font-size:15px; font-weight:600;}
+  .sheet-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:0 22px;}
+  .sheet-grid .r{display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:12.5px; color:var(--ink-2);}
+  .sheet-grid .r b{font-family:var(--mono); color:var(--ink); font-weight:600; white-space:nowrap;}
+  .sheet-grid .r.warn b{color:var(--rose);}
+  .sheet-grid .hdr{grid-column:1/-1; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--accent); padding:14px 0 4px;}
+  .sheet-note{font-size:12px; color:var(--ink-3); line-height:1.65; margin-top:14px;}
+  .sheet-note b{color:var(--ink-2);}
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:24px; z-index:50;
+    transform:translate(-50%, 20px); opacity:0; pointer-events:none;
+    background:var(--panel); border:1px solid var(--line); box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:11px 16px; border-radius:11px; font-size:13px; display:flex; gap:10px; align-items:center;
+    transition:transform .25s cubic-bezier(.2,.9,.3,1.2), opacity .2s; max-width:calc(100vw - 32px);
+  }
+  .toast.on{transform:translate(-50%,0); opacity:1;}
+  .toast svg{color:var(--green); flex:none;}
+  .toast.bad svg{color:var(--rose);}
+
+  @media (max-width:720px){
+    .brand p{display:none;}
+    .topbar{padding:10px 16px;}
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Bond Stepped Fretboard <span>Profile Tool</span></h1>
-  <p>Sawtooth fret-step profile — single scale or multiscale (fanned) with a fully adjustable perpendicular fret. 2D profile for Fusion import; STEP is a true B-rep solid; STL is the mesh fallback.</p>
+<header class="topbar">
+  <div class="brand">
+    <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+      <rect width="38" height="38" rx="10" fill="var(--accent-soft)"/>
+      <path d="M6 26 L6 22 L12 22 L12 15 L18 20 L18 13 L24 18 L24 11 L32 17 L32 26 Z" fill="var(--accent)" opacity=".9"/>
+      <path d="M6 29 H32" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+    </svg>
+    <div style="min-width:0">
+      <h1>Step<span>board</span></h1>
+      <p>Bond-style stepped fretboard designer · STEP · STL · SVG · DXF · PDF</p>
+    </div>
+  </div>
+  <div class="bar-tools">
+    <select id="preset" aria-label="Load a preset">
+      <option value="">Presets…</option>
+    </select>
+    <div class="seg" role="group" aria-label="Units">
+      <button data-unit="mm" aria-pressed="true">mm</button>
+      <button data-unit="in" aria-pressed="false">inch</button>
+    </div>
+    <button class="icon-btn" id="themeBtn" title="Switch light / dark" aria-label="Switch light or dark theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <button class="icon-btn" id="resetBtn" title="Reset all settings" aria-label="Reset all settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+    </button>
+  </div>
 </header>
 
-<div class="wrap">
-  <div class="panel form">
+<div class="layout">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
 
-    <div class="group">
-      <div class="group-title">Units</div>
-      <div class="toggle-row">
-        <div class="toggle-btn active" data-unit="mm">MM</div>
-        <div class="toggle-btn" data-unit="in">INCH</div>
-      </div>
-      <div class="hint">Inputs read in the selected unit. STEP and STL are always written in millimeters; the PDF is drawn 1:1 (mm). Scale lengths are clamped to 23–31&nbsp;in (584.2–787.4&nbsp;mm).</div>
-    </div>
-
-    <div class="group">
-      <div class="group-title">Scale &amp; Frets</div>
-
-      <div class="l" style="font-size:11.5px;color:var(--ink-dim);margin-bottom:6px;">Scale type</div>
-      <div class="toggle-row" id="scaleTypeToggle">
-        <div class="toggle-btn active" data-scaletype="single">SINGLE</div>
-        <div class="toggle-btn" data-scaletype="multi">MULTISCALE</div>
-      </div>
-
-      <label class="field" id="singleScaleField">
-        <div class="l">Scale length <span class="u u-len">mm</span></div>
-        <input type="number" id="scaleLength" value="648" step="0.1">
-      </label>
-
-      <div id="multiScaleFields" class="hidden">
-        <div class="row2">
-          <label class="field">
-            <div class="l">Treble scale <span class="u u-len">mm</span></div>
-            <input type="number" id="trebleScale" value="648" step="0.1">
-          </label>
-          <label class="field">
-            <div class="l">Bass scale <span class="u u-len">mm</span></div>
-            <input type="number" id="bassScale" value="686" step="0.1">
-          </label>
+    <details class="sec card" open>
+      <summary>
+        <span class="sec-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 18h18M6 18V8M10 18v-6M14 18v-4M18 18v-3"/></svg></span>
+        Scale &amp; frets <span class="sec-sub" id="secScaleSub"></span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body">
+        <div>
+          <div class="field-label">Scale type</div>
+          <div class="seg full" role="group" aria-label="Scale type">
+            <button data-scaletype="single" aria-pressed="true">Single scale</button>
+            <button data-scaletype="multi" aria-pressed="false">Multiscale (fanned)</button>
+          </div>
         </div>
-        <label class="field">
-          <div class="l">Perpendicular fret</div>
-          <select id="perpFret"></select>
-        </label>
-        <div class="hint">The perpendicular fret is held square to the centerline. Nut = frets fan out toward the bridge. A middle fret squares that fret (both ends fan). Bridge = the fan reverses, widest at the nut and converging toward the bridge. Treble = high-E edge (shorter); bass = low-string edge (longer).</div>
+        <div id="singleScaleField"><div class="ctl" data-key="scaleLength"></div></div>
+        <div id="multiScaleFields" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="ctl" data-key="trebleScale"></div>
+          <div class="ctl" data-key="bassScale"></div>
+          <div>
+            <div class="field-label">Perpendicular fret</div>
+            <select id="perpFret" class="full-select"></select>
+          </div>
+        </div>
+        <div class="ctl" data-key="numFrets"></div>
+        <div class="ctl" data-key="overhang"></div>
+        <button class="help-toggle" data-help="helpScale">ⓘ How scale &amp; fan work</button>
+        <div class="help hidden" id="helpScale">
+          Scale lengths are clamped to 23–31&nbsp;in (584.2–787.4&nbsp;mm). For multiscale, the <b>perpendicular fret</b> is held square to the centerline. <b>Nut</b>: frets fan out toward the bridge. <b>A middle fret</b>: that fret is square and both ends fan. <b>Bridge</b>: the fan reverses, widest at the nut. Treble = high-E edge (shorter); bass = low-string edge (longer).
+        </div>
       </div>
-
-      <label class="field">
-        <div class="l">Number of frets (steps)</div>
-        <input type="number" id="numFrets" value="22" step="1" min="1" max="36">
-      </label>
-      <label class="field">
-        <div class="l">Length past last fret <span class="u u-len">mm</span></div>
-        <input type="number" id="overhang" value="18" step="0.1" min="0.5">
-      </label>
-    </div>
-
-    <div class="group">
-      <div class="group-title">Step Geometry</div>
-      <label class="field">
-        <div class="l">Base thickness (to trough) <span class="u u-len">mm</span></div>
-        <input type="number" id="baseThickness" value="8" step="0.1" min="0.5">
-      </label>
-      <label class="field">
-        <div class="l">Fret contact height <span class="u u-len">mm</span></div>
-        <input type="number" id="fretHeight" value="1.0" step="0.05" min="0.05">
-      </label>
-      <div class="hint">Each step is a right triangle: a vertical wall at the fret position (the string-contact edge) rising by the fret contact height, then a straight slope back down to the base of the next fret's wall. Base thickness is measured to the low point (trough) of the sawtooth.</div>
-      <div class="readout" id="readout"></div>
-    </div>
-
-    <div class="group">
-      <div class="group-title">Board Taper <small style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0;">(STEP / STL)</small></div>
-      <div class="row2">
-        <label class="field">
-          <div class="l">Nut width <span class="u u-len">mm</span></div>
-          <input type="number" id="nutWidth" value="43" step="0.1" min="1">
-        </label>
-        <label class="field">
-          <div class="l">Heel width <span class="u u-len">mm</span></div>
-          <input type="number" id="heelWidth" value="57" step="0.1" min="1">
-        </label>
-      </div>
-      <div class="hint">Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel and single scale for a plain parallel extrusion.</div>
-    </div>
-
-    <div class="group">
-      <div class="group-title">Fingerboard Radius <small style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0;">(STEP / STL)</small></div>
-      <div class="toggle-row" id="radiusToggle">
-        <div class="toggle-btn active" data-radius="flat">FLAT</div>
-        <div class="toggle-btn" data-radius="curved">RADIUSED</div>
-      </div>
-      <div id="radiusFields" class="hidden">
-        <label class="field">
-          <div class="l">Radius <span class="u u-len">mm</span></div>
-          <input type="number" id="boardRadius" value="304.8" step="0.1">
-        </label>
-        <label class="field">
-          <div class="l">Arc facets (smoothness)</div>
-          <input type="number" id="arcFacets" value="24" step="1" min="4" max="96">
-        </label>
-        <div class="hint">The radius is a cylinder whose axis runs along the neck, so the curve is across the width; the side profile is unchanged. The crown (center) keeps the full base thickness and the edges thin out by the sagitta. Minimum 7.25&nbsp;in (184.15&nbsp;mm). Higher facets = smoother arc, larger mesh. <b style="color:var(--amber)">Note:</b> in the STEP solid the radius is faceted into this many planar strips (still a real solid, just polygonal in section). Flat mode STEP is mathematically exact.</div>
-        <div class="readout" id="radiusReadout"></div>
-      </div>
-    </div>
-
-    <details class="fretTable">
-      <summary>Fret position table</summary>
-      <div id="fretTableWrap"></div>
     </details>
 
-    <div class="footnote">
-      Flat (unradiused) Bond-style stepped board. No traditional metal frets, no compound radius. The nut region (before fret 1) is flat at trough height; there's no zero-fret step. Single scale: one 2D side profile drives everything. Multiscale: the treble and bass edges are two different profiles, so the SVG/DXF/PDF (which are inherently single-scale 2D views) are disabled — the STEP and STL loft between the two edges and are the multiscale deliverables.
-    </div>
-  </div>
-
-  <div class="panel main">
-    <div class="viewhead">
-      <h2>Side Profile <small>&nbsp;— single: extrude across width. multiscale: preview shows both edges; use the STEP.</small></h2>
-      <div class="btns">
-        <button class="dl" data-export="profile-svg" id="btnSvgSingle">Download SVG</button>
-        <button class="dl" data-export="svg-treble" id="btnSvgTreble">SVG · Treble</button>
-        <button class="dl" data-export="svg-bass" id="btnSvgBass">SVG · Bass</button>
-        <button class="dl" data-export="profile-dxf" id="btnDxfSingle">Download DXF</button>
-        <button class="dl" data-export="dxf-treble" id="btnDxfTreble">DXF · Treble</button>
-        <button class="dl" data-export="dxf-bass" id="btnDxfBass">DXF · Bass</button>
-        <button class="dl" data-export="profile-pdf" id="btnPdf">Download PDF (1:1)</button>
-        <button class="dl solid" data-export="step" id="btnStep">Download STEP (solid)</button>
-        <button class="dl primary" data-export="stl">Download STL</button>
+    <details class="sec card" open>
+      <summary>
+        <span class="sec-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 19V14l6 0V7l6 5V5l6 5v9z"/></svg></span>
+        Step geometry
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body">
+        <div class="ctl" data-key="baseThickness"></div>
+        <div class="ctl" data-key="fretHeight"></div>
+        <div class="mini-read" id="stepRead"></div>
+        <button class="help-toggle" data-help="helpStep">ⓘ What the step looks like</button>
+        <div class="help hidden" id="helpStep">
+          Each step is a right triangle: a <b>vertical wall</b> at the fret position (the string-contact edge) rising by the fret contact height, then a <b>straight slope</b> back down to the base of the next fret's wall. Base thickness is measured to the low point (trough). The nut region before fret 1 is flat at trough height — there's no zero-fret step.
+        </div>
       </div>
-    </div>
-    <div class="legend" id="legend"></div>
-    <div class="viewbox"><svg id="profileSVG"></svg></div>
-    <div class="hint" id="previewNote"></div>
-    <div class="statusbar" id="statusbar">STEP export ready. The STEP file is a watertight <b>MANIFOLD_SOLID_BREP</b> — open it in Fusion with File → Open (or Insert → Insert Derive) and it arrives as a real BRepBody you can fillet, boolean and machine. No mesh conversion involved.</div>
-  </div>
+    </details>
+
+    <details class="sec card" open>
+      <summary>
+        <span class="sec-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 9l18-3v12L3 15z"/></svg></span>
+        Board taper <span class="sec-sub">STEP · STL</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body">
+        <div class="ctl" data-key="nutWidth"></div>
+        <div class="ctl" data-key="heelWidth"></div>
+        <button class="help-toggle" data-help="helpTaper">ⓘ About the taper</button>
+        <div class="help hidden" id="helpTaper">
+          Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel with single scale for a plain parallel extrusion.
+        </div>
+      </div>
+    </details>
+
+    <details class="sec card" open>
+      <summary>
+        <span class="sec-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 16c4-6 14-6 18 0"/><path d="M3 20h18"/></svg></span>
+        Fingerboard radius <span class="sec-sub">STEP · STL</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body">
+        <div class="seg full" role="group" aria-label="Fingerboard radius">
+          <button data-radius="flat" aria-pressed="true">Flat</button>
+          <button data-radius="curved" aria-pressed="false">Radiused</button>
+        </div>
+        <div id="radiusFields" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="ctl" data-key="boardRadius"></div>
+          <div class="ctl" data-key="arcFacets"></div>
+          <div class="mini-read" id="radiusRead"></div>
+          <div id="radiusAlert"></div>
+          <button class="help-toggle" data-help="helpRadius">ⓘ About the radius</button>
+          <div class="help hidden" id="helpRadius">
+            The radius is a cylinder whose axis runs along the neck, so the curve is across the width; the side profile is unchanged. The crown keeps the full base thickness and the edges thin out by the sagitta. Minimum 7.25&nbsp;in (184.15&nbsp;mm). In the STEP solid the arc is faceted into this many planar strips (still a real solid, just polygonal in section). Flat mode STEP is mathematically exact.
+          </div>
+        </div>
+      </div>
+    </details>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <section class="stats" id="stats" aria-label="Key numbers"></section>
+
+    <section class="card viewer">
+      <div class="viewer-bar">
+        <div class="tabs" role="tablist">
+          <button role="tab" data-view="3d" aria-selected="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 22V12M21 7l-9 5-9-5"/></svg>3D
+          </button>
+          <button role="tab" data-view="profile" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 18V14h5V9l5 4V7l5 4V5l5 4v9z"/></svg>Side profile
+          </button>
+          <button role="tab" data-view="table" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>Fret table
+          </button>
+        </div>
+        <div class="viewer-tools">
+          <label class="exag" id="exagCtl" title="Preview only — exported files are always true scale">
+            Height ×<input type="range" id="exag" min="1" max="12" step="1" value="4"><b id="exagVal">4×</b>
+          </label>
+          <button class="pill-btn" id="spinBtn" aria-pressed="true" title="Auto-rotate">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Spin
+          </button>
+          <button class="pill-btn" id="viewResetBtn" title="Reset camera">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Fit
+          </button>
+        </div>
+      </div>
+      <div class="stage" id="stage">
+        <div class="pane" id="glPane">
+          <canvas id="glCanvas"></canvas>
+          <div class="gl-fallback hidden" id="glFallback">The 3D preview needs an internet connection the first time it loads.<br>Everything else — including all exports — works offline.</div>
+          <div class="stage-hint" id="glHint">Drag to orbit · Right-drag or Shift-drag to pan · Scroll to zoom · Double-click to fit</div>
+          <div class="stage-badge" id="glBadge"></div>
+        </div>
+        <div class="pane hidden" id="profilePane">
+          <div class="legend" id="legend"></div>
+          <svg id="profileSVG"></svg>
+          <div class="tip" id="tip"></div>
+          <div class="stage-hint">Hover to inspect a fret · Height exaggerated for clarity — files are true scale</div>
+        </div>
+        <div class="pane hidden" id="tablePane">
+          <div class="table-tools"><button class="pill-btn" id="csvBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Download CSV</button></div>
+          <div id="fretTableWrap"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card export">
+      <div class="export-head">
+        <h2>Export</h2>
+        <p>3D files are always written in millimeters.</p>
+      </div>
+      <div class="tiles">
+        <div class="tile rec">
+          <span class="tag">Best</span>
+          <div class="fmt">STEP</div>
+          <div class="desc">True B-rep solid. Opens in Fusion as a real body you can fillet, boolean and machine.</div>
+          <div class="acts"><button class="dl" data-export="step">Download</button></div>
+        </div>
+        <div class="tile">
+          <div class="fmt">STL</div>
+          <div class="desc">Watertight mesh for 3D printing or mesh-based CAM.</div>
+          <div class="acts"><button class="dl" data-export="stl">Download</button></div>
+        </div>
+        <div class="tile">
+          <div class="fmt">SVG</div>
+          <div class="desc" id="svgDesc">2D side profile, 1 unit = 1 mm, with origin datum.</div>
+          <div class="acts" id="svgActs"></div>
+        </div>
+        <div class="tile">
+          <div class="fmt">DXF</div>
+          <div class="desc" id="dxfDesc">2D side profile as a closed polyline for CAD/CAM.</div>
+          <div class="acts" id="dxfActs"></div>
+        </div>
+        <div class="tile" id="pdfTile">
+          <div class="fmt">PDF</div>
+          <div class="desc" id="pdfDesc">Side profile drawn at true 1:1 scale.</div>
+          <div class="acts"><button class="dl" data-export="profile-pdf" id="btnPdf">Download</button></div>
+        </div>
+      </div>
+      <div class="statusbar" id="statusbar"><span class="dot"></span><span id="statusText">Ready. The STEP file is a watertight <b>MANIFOLD_SOLID_BREP</b> — open it in Fusion with File → Open (or Insert → Insert Derive) and it arrives as a real body. No mesh conversion involved.</span></div>
+    </section>
+
+    <section class="card sheet">
+      <h2>Build sheet</h2>
+      <div class="sheet-grid" id="readout"></div>
+      <div class="sheet-note" id="previewNote"></div>
+    </section>
+  </main>
 </div>
 
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+  <span id="toastText"></span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
 
-  let unit = 'mm';
-  let scaleType = 'single';
-  let radiusMode = 'flat';
-  let lastPerpN = -1;
   const MM_PER_IN = 25.4;
   const MIN_SCALE_MM = 23 * MM_PER_IN;   // 584.2
   const MAX_SCALE_MM = 31 * MM_PER_IN;   // 787.4
   const MIN_RADIUS_MM = 7.25 * MM_PER_IN; // 184.15
-
-  function toMM(v){ return unit === 'in' ? v * MM_PER_IN : v; }
-  function clampScale(mm){
-    const c = Math.min(MAX_SCALE_MM, Math.max(MIN_SCALE_MM, mm));
-    return { value:c, clamped: Math.abs(c - mm) > 1e-6 };
-  }
   function $(id){ return document.getElementById(id); }
 
+  // ================================================================
+  //  CONTROL SPECS + STATE  (all lengths stored internally in mm)
+  // ================================================================
+  const SPECS = {
+    scaleLength:   {label:'Scale length',          len:true, def:648,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
+    trebleScale:   {label:'Treble scale (high E)', len:true, def:648,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
+    bassScale:     {label:'Bass scale (low E)',    len:true, def:686,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
+    numFrets:      {label:'Number of frets',       len:false,def:22,     min:1,   max:36,  step:1},
+    overhang:      {label:'Length past last fret', len:true, def:18,     min:0.5, max:80,  step:0.1},
+    baseThickness: {label:'Base thickness (to trough)', len:true, def:8, min:0.5, max:25,  step:0.1},
+    fretHeight:    {label:'Fret contact height',   len:true, def:1.0,    min:0.05,max:5,   step:0.05},
+    nutWidth:      {label:'Nut width',             len:true, def:43,     min:20,  max:90,  step:0.1},
+    heelWidth:     {label:'Heel width',            len:true, def:57,     min:20,  max:110, step:0.1},
+    boardRadius:   {label:'Radius',                len:true, def:304.8,  min:MIN_RADIUS_MM, max:1000, step:0.1},
+    arcFacets:     {label:'Arc facets (smoothness)', len:false, def:24,  min:4,   max:96,  step:1},
+  };
+  const WOODS = [
+    {id:'phenolic', name:'Phenolic (Bond-style)', rho:1.36, color:0x26221f},
+    {id:'ebony',    name:'Ebony',                 rho:1.12, color:0x2b2421},
+    {id:'richlite', name:'Richlite',              rho:1.35, color:0x1e1e1f},
+    {id:'rosewood', name:'Indian rosewood',       rho:0.83, color:0x5b3424},
+    {id:'pauferro', name:'Pau ferro',             rho:0.87, color:0x6e4a32},
+    {id:'maple',    name:'Maple',                 rho:0.70, color:0xd9bb88},
+  ];
+  const PRESETS = [
+    {name:'Fender-style · 25.5″', st:'single', v:{scaleLength:647.7, numFrets:21, nutWidth:42.0, heelWidth:56.0, boardRadius:241.3}},
+    {name:'Gibson-style · 24.75″', st:'single', v:{scaleLength:628.65, numFrets:22, nutWidth:43.0, heelWidth:57.0, boardRadius:304.8}},
+    {name:'PRS-style · 25″', st:'single', v:{scaleLength:635.0, numFrets:24, nutWidth:42.9, heelWidth:56.4, boardRadius:254.0}},
+    {name:'Baritone · 27″', st:'single', v:{scaleLength:685.8, numFrets:24, nutWidth:46.0, heelWidth:58.0, boardRadius:355.6}},
+    {name:'Multiscale · 25.5–27″', st:'multi', perp:'8', v:{trebleScale:647.7, bassScale:685.8, numFrets:24, nutWidth:43.0, heelWidth:57.0, boardRadius:406.4}},
+    {name:'Multiscale 7-string · 25.5–27″', st:'multi', perp:'8', v:{trebleScale:647.7, bassScale:685.8, numFrets:24, nutWidth:48.0, heelWidth:62.0, boardRadius:508.0}},
+  ];
+
+  const DEFAULT_STATE = () => ({
+    unit:'mm', scaleType:'single', radiusMode:'flat', perpChoice:'nut',
+    wood:'phenolic', exag:4, spin:true, view:'3d',
+    vals: Object.fromEntries(Object.entries(SPECS).map(([k,s])=>[k,s.def])),
+  });
+  const STORE_KEY = 'stepboard.v1';
+  let S = DEFAULT_STATE();
+  try{
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if(saved && saved.vals){ S = Object.assign(DEFAULT_STATE(), saved); S.vals = Object.assign(DEFAULT_STATE().vals, saved.vals); }
+  }catch(e){}
+  function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+  let theme = 'dark';
+  try{ theme = localStorage.getItem('stepboard.theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }catch(e){}
+  document.documentElement.dataset.theme = theme;
+
+  // ---------- unit helpers ----------
+  const unitOf = spec => spec.len ? S.unit : '';
+  function toDisp(mm, spec){ return (spec.len && S.unit==='in') ? mm / MM_PER_IN : mm; }
+  function fromDisp(v, spec){ return (spec.len && S.unit==='in') ? v * MM_PER_IN : v; }
+  function dispDecimals(spec){ return !spec.len ? 0 : (S.unit==='in' ? 4 : 2); }
+  function trimNum(v, d){ return String(parseFloat(v.toFixed(d))); }
+  // Length in the selected unit, for readouts.
+  function L(mm, d){
+    if(S.unit==='in') return (mm/MM_PER_IN).toFixed(d==null?3:d+1) + ' in';
+    return mm.toFixed(d==null?2:d) + ' mm';
+  }
+  function Lnum(mm){ return S.unit==='in' ? (mm/MM_PER_IN).toFixed(3) : mm.toFixed(2); }
+
+  // ================================================================
+  //  FRET MATH + GEOMETRY  (unchanged from the original tool)
+  // ================================================================
   // ---------- fret math ----------
   function fretPositions(scaleLen, numFrets){
     const arr = [];
@@ -430,6 +724,8 @@
     return {x:nx/L, y:ny/L, z:nz/L};
   }
 
+
+
   // ---------- perpendicular-fret dropdown ----------
   function perpLabel(choice){
     if(choice==='nut') return 'Nut (fret 0)';
@@ -438,59 +734,49 @@
   }
   function populatePerpOptions(N){
     const sel = $('perpFret');
-    const prev = sel.value;
-    let html = '<option value="nut">Nut (fret 0)</option>';
+    const prev = S.perpChoice;
+    let html = '<option value="nut">Nut (fret 0) — fans toward bridge</option>';
     for(let k=1;k<=N;k++) html += `<option value="${k}">Fret ${k}</option>`;
-    html += '<option value="bridge">Bridge (fan reverses)</option>';
+    html += '<option value="bridge">Bridge — fan reverses</option>';
     sel.innerHTML = html;
     const kprev = parseInt(prev);
     const valid = (prev==='nut'||prev==='bridge'|| (kprev>=1 && kprev<=N));
-    sel.value = valid ? prev : 'nut';
+    S.perpChoice = valid ? prev : 'nut';
+    sel.value = S.perpChoice;
   }
 
   function getParams(){
-    const numFrets = Math.max(1, Math.round(parseFloat($('numFrets').value)||22));
-    const multiscale = (scaleType === 'multi');
-
-    let bassRaw, trebleRaw;
-    if(multiscale){
-      trebleRaw = toMM(parseFloat($('trebleScale').value)||648);
-      bassRaw   = toMM(parseFloat($('bassScale').value)||686);
-    } else {
-      const s = toMM(parseFloat($('scaleLength').value)||648);
-      trebleRaw = s; bassRaw = s;
-    }
+    const v = S.vals;
+    const num = (x, d) => (typeof x === 'number' && isFinite(x)) ? x : d;
+    const numFrets = Math.min(36, Math.max(1, Math.round(num(v.numFrets, 22))));
+    const multiscale = (S.scaleType === 'multi');
+    let trebleRaw, bassRaw;
+    if(multiscale){ trebleRaw = num(v.trebleScale, 648); bassRaw = num(v.bassScale, 686); }
+    else { trebleRaw = bassRaw = num(v.scaleLength, 648); }
     const tC = clampScale(trebleRaw), bC = clampScale(bassRaw);
-
     return {
-      multiscale,
-      numFrets,
-      perpChoice: multiscale ? ($('perpFret').value || 'nut') : 'nut',
-      trebleScale: tC.value,
-      bassScale: bC.value,
-      trebleClamped: tC.clamped,
-      bassClamped: bC.clamped,
-      overhang: Math.max(0.1, toMM(parseFloat($('overhang').value)||18)),
-      baseThickness: Math.max(0.1, toMM(parseFloat($('baseThickness').value)||8)),
-      fretHeight: Math.max(0.01, toMM(parseFloat($('fretHeight').value)||1.0)),
-      nutWidth: Math.max(0.1, toMM(parseFloat($('nutWidth').value)||43)),
-      heelWidth: Math.max(0.1, toMM(parseFloat($('heelWidth').value)||57)),
-      radiused: (radiusMode === 'curved'),
-      // Radius clamped to a safe minimum; sagitta feasibility checked at build.
-      boardRadius: Math.max(MIN_RADIUS_MM, toMM(parseFloat($('boardRadius').value)||304.8)),
-      arcFacets: Math.max(4, Math.min(96, Math.round(parseFloat($('arcFacets').value)||24))),
+      multiscale, numFrets,
+      perpChoice: multiscale ? (S.perpChoice || 'nut') : 'nut',
+      trebleScale: tC.value, bassScale: bC.value,
+      trebleClamped: tC.clamped, bassClamped: bC.clamped,
+      overhang:      Math.max(0.1,  num(v.overhang, 18)),
+      baseThickness: Math.max(0.1,  num(v.baseThickness, 8)),
+      fretHeight:    Math.max(0.01, num(v.fretHeight, 1)),
+      nutWidth:      Math.max(0.1,  num(v.nutWidth, 43)),
+      heelWidth:     Math.max(0.1,  num(v.heelWidth, 57)),
+      radiused: (S.radiusMode === 'curved'),
+      boardRadius: Math.max(MIN_RADIUS_MM, num(v.boardRadius, 304.8)),
+      radiusClamped: num(v.boardRadius, 304.8) < MIN_RADIUS_MM - 1e-6,
+      arcFacets: Math.max(4, Math.min(96, Math.round(num(v.arcFacets, 24)))),
     };
   }
-
-  // ---------- SVG ----------
-  const NS = 'http://www.w3.org/2000/svg';
-  function svgEl(tag, attrs){
-    const el = document.createElementNS(NS, tag);
-    for(const k in attrs) el.setAttribute(k, attrs[k]);
-    return el;
+  function clampScale(mm){
+    const c = Math.min(MAX_SCALE_MM, Math.max(MIN_SCALE_MM, mm));
+    return { value:c, clamped: Math.abs(c - mm) > 1e-6 };
   }
-  function ptsStr(pts){ return pts.map(p=>p[0].toFixed(3)+','+p[1].toFixed(3)).join(' '); }
 
+  // ---------- SVG export ----------
+  function ptsStr(pts){ return pts.map(p=>p[0].toFixed(3)+','+p[1].toFixed(3)).join(' '); }
   // Standalone SVG string for one edge polygon, in shared mm coordinates
   // (y-up flipped for screen, but geometry is 1 unit = 1 mm). Includes a datum
   // cross at the origin and a tick at the perpendicular fret so both files drop
@@ -518,121 +804,6 @@
     return s;
   }
 
-  function renderProfile(model){
-    const svg = $('profileSVG');
-    svg.innerHTML = '';
-    const edges = model.multiscale ? [model.bass, model.treble] : [model.treble];
-
-    const allPts = [].concat(...edges.map(e=>e.polygon));
-    const minX = Math.min(...allPts.map(p=>p.x));
-    const maxX = Math.max(...allPts.map(p=>p.x));
-    const maxZ = Math.max(...allPts.map(p=>p.z));
-    const pad = Math.max(4, maxZ*0.3);
-    const vbX = minX-pad, vbY = -pad, vbW = (maxX-minX)+pad*2, vbH = maxZ+pad*2;
-    svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
-    svg.style.aspectRatio = (vbW/vbH);
-
-    const g = svgEl('g', {transform:`translate(0,${maxZ}) scale(1,-1)`});
-    svg.appendChild(g);
-
-    const styles = model.multiscale
-      ? { bass:{stroke:'#ffb454', fill:'rgba(255,180,84,0.06)'}, treble:{stroke:'#5fe3e0', fill:'rgba(95,227,224,0.08)'} }
-      : { treble:{stroke:'#5fe3e0', fill:'rgba(95,227,224,0.08)'} };
-
-    edges.forEach(edge=>{
-      const which = (edge===model.treble) ? 'treble' : 'bass';
-      const st = styles[which];
-      g.appendChild(svgEl('polygon',{
-        points: ptsStr(edge.polygon.map(p=>[p.x,p.z])),
-        fill:st.fill, stroke:st.stroke, 'stroke-width':0.5,
-        'vector-effect':'non-scaling-stroke', 'stroke-linejoin':'round'
-      }));
-    });
-
-    // fret number labels along the treble edge peaks
-    const labelG = svgEl('g', {transform:`translate(0,${maxZ}) scale(1,-1)`});
-    svg.appendChild(labelG);
-    model.treble.profile.forEach(p=>{
-      if(p.kind==='peak'){
-        const t = svgEl('text',{
-          x:p.x, y:maxZ-(p.z)+ (-2.2), 'font-size':Math.max(2, maxZ*0.09),
-          fill:'#7d93a3', 'text-anchor':'middle'
-        });
-        t.textContent = p.fret;
-        labelG.appendChild(t);
-      }
-    });
-
-    g.appendChild(svgEl('line',{
-      x1:minX,y1:0,x2:maxX,y2:0, stroke:'#223140','stroke-width':0.25,'vector-effect':'non-scaling-stroke'
-    }));
-
-    // legend
-    const legend = $('legend');
-    if(model.multiscale){
-      legend.innerHTML =
-        '<span><span class="sw" style="background:#5fe3e0"></span>Treble edge ('+model.treble.scaleLen.toFixed(1)+' mm)</span>' +
-        '<span><span class="sw" style="background:#ffb454"></span>Bass edge ('+model.bass.scaleLen.toFixed(1)+' mm)</span>' +
-        '<span>Perpendicular: '+perpLabel(model.params.perpChoice)+'</span>';
-    } else {
-      legend.innerHTML = '<span><span class="sw" style="background:#5fe3e0"></span>Side profile ('+model.treble.scaleLen.toFixed(1)+' mm)</span>';
-    }
-  }
-
-  function renderReadout(model){
-    const p = model.params;
-    const el = $('readout');
-    el.innerHTML = '';
-    const peak = p.baseThickness + p.fretHeight;
-    const rows = [];
-    if(p.multiscale){
-      rows.push(['Treble scale', p.trebleScale.toFixed(2)+' mm', p.trebleClamped]);
-      rows.push(['Bass scale', p.bassScale.toFixed(2)+' mm', p.bassClamped]);
-      rows.push(['Fan (bass − treble)', (p.bassScale-p.trebleScale).toFixed(2)+' mm', false]);
-      rows.push(['Perpendicular at', perpLabel(p.perpChoice), false]);
-      rows.push(['Treble profile length', model.treble.totalLength.toFixed(2)+' mm', false]);
-      rows.push(['Bass profile length', model.bass.totalLength.toFixed(2)+' mm', false]);
-      rows.push(['— LOFT SETUP —', '', false]);
-      rows.push(['Sketch separation (= heel width)', p.heelWidth.toFixed(2)+' mm', false]);
-      rows.push(['Perp-fret x (align both sketches)', (model.perpX||0).toFixed(2)+' mm', false]);
-      rows.push(['Board width at perp fret', (model.widthAtPerp||0).toFixed(2)+' mm', false]);
-    } else {
-      rows.push(['Scale length', p.trebleScale.toFixed(2)+' mm', p.trebleClamped]);
-      rows.push(['Total profile length', model.treble.totalLength.toFixed(2)+' mm', false]);
-    }
-    rows.push(['Trough (low) height', p.baseThickness.toFixed(2)+' mm', false]);
-    rows.push(['Peak (fret contact) height', peak.toFixed(2)+' mm', false]);
-    rows.push(['Nut width (solid)', p.nutWidth.toFixed(2)+' mm', false]);
-    rows.push(['Heel width (solid)', p.heelWidth.toFixed(2)+' mm', false]);
-
-    rows.forEach(r=>{
-      const d = document.createElement('div');
-      d.className = 'r' + (r[2] ? ' warn' : '');
-      const note = r[2] ? ' (clamped 23–31 in)' : '';
-      d.innerHTML = `<span>${r[0]}${note}</span><b>${r[1]}</b>`;
-      el.appendChild(d);
-    });
-  }
-
-  function renderFretTable(model){
-    const p = model.params;
-    const tx = model.treble.fretX, bx = model.bass.fretX;
-    let html;
-    if(p.multiscale){
-      html = '<table><thead><tr><th>Fret</th><th>Treble x (mm)</th><th>Bass x (mm)</th><th>Fan Δx (mm)</th></tr></thead><tbody>';
-      for(let k=0;k<=p.numFrets;k++){
-        html += `<tr><td>${k===0?'Nut':k}</td><td>${tx[k].toFixed(2)}</td><td>${bx[k].toFixed(2)}</td><td>${(bx[k]-tx[k]).toFixed(2)}</td></tr>`;
-      }
-    } else {
-      html = '<table><thead><tr><th>Fret</th><th>Distance from nut (mm)</th><th>Fret-to-fret (mm)</th></tr></thead><tbody>';
-      for(let k=0;k<=p.numFrets;k++){
-        const gap = k===0 ? '—' : (tx[k]-tx[k-1]).toFixed(2);
-        html += `<tr><td>${k===0?'Nut':k}</td><td>${tx[k].toFixed(2)}</td><td>${gap}</td></tr>`;
-      }
-    }
-    html += '</tbody></table>';
-    $('fretTableWrap').innerHTML = html;
-  }
 
   // ---------- DXF ----------
   function dxfHeader(){ return "0\nSECTION\n2\nENTITIES\n"; }
@@ -800,6 +971,11 @@
         tris.push([A[i], B[j], B[i]]);
       }
     }
+    // Same trick as the STEP writer: a negative signed volume means every
+    // facet faces inward, so flip them all (slicers flag inside-out meshes).
+    let vol = 0;
+    tris.forEach(([a,b,c])=>{ vol += a.x*(b.y*c.z - b.z*c.y) - a.y*(b.x*c.z - b.z*c.x) + a.z*(b.x*c.y - b.y*c.x); });
+    if(vol < 0) tris.forEach(t=>{ const tmp = t[1]; t[1] = t[2]; t[2] = tmp; });
     return tris;
   }
   function normalOf(a,b,c){
@@ -1031,22 +1207,83 @@
     ].join('\n');
   }
 
-  // ---------- build + render ----------
-  let currentModel = null;
 
-  function setStatus(html, bad){
-    const el = $('statusbar');
-    el.className = 'statusbar' + (bad ? ' bad' : '');
-    el.innerHTML = html;
+  // ================================================================
+  //  CONTROLS
+  // ================================================================
+  function buildControls(){
+    document.querySelectorAll('.ctl[data-key]').forEach(el=>{
+      const key = el.dataset.key, spec = SPECS[key];
+      el.innerHTML =
+        `<div class="ctl-head"><label for="n_${key}">${spec.label}</label><span class="u">${unitOf(spec)}</span></div>` +
+        `<div class="ctl-row"><input type="range" id="r_${key}" aria-label="${spec.label}"><input type="number" id="n_${key}" inputmode="decimal"></div>` +
+        `<div class="ctl-warn" id="w_${key}"></div>`;
+      const r = $('r_'+key), n = $('n_'+key);
+      r.addEventListener('input', ()=>{
+        S.vals[key] = fromDisp(parseFloat(r.value), spec);
+        n.value = trimNum(parseFloat(r.value), dispDecimals(spec));
+        paintRange(r);
+        schedule();
+      });
+      n.addEventListener('input', ()=>{
+        const x = parseFloat(n.value);
+        if(!isFinite(x)) return;
+        S.vals[key] = fromDisp(x, spec);
+        r.value = x; paintRange(r);
+        schedule();
+      });
+      n.addEventListener('blur', ()=> syncControl(key));
+    });
   }
+  function paintRange(r){
+    const min = parseFloat(r.min), max = parseFloat(r.max), v = parseFloat(r.value);
+    const p = max>min ? Math.min(100, Math.max(0, (v-min)/(max-min)*100)) : 0;
+    r.style.setProperty('--p', p+'%');
+  }
+  function syncControl(key){
+    const spec = SPECS[key], r = $('r_'+key), n = $('n_'+key);
+    if(!r) return;
+    const d = dispDecimals(spec);
+    const st = spec.len && S.unit==='in' ? (spec.step < 0.1 ? 0.002 : 0.005) : spec.step;
+    r.min = toDisp(spec.min, spec); r.max = toDisp(spec.max, spec); r.step = st;
+    n.step = st;
+    r.value = toDisp(S.vals[key], spec);
+    n.value = trimNum(toDisp(S.vals[key], spec), d);
+    paintRange(r);
+    const head = r.closest('.ctl').querySelector('.u');
+    if(head) head.textContent = unitOf(spec);
+  }
+  function syncAllControls(){ Object.keys(SPECS).forEach(syncControl); }
+
+  function setPressed(attr, val){
+    document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.setAttribute('aria-pressed', String(b.dataset[attr]===val)));
+  }
+  function syncModes(){
+    setPressed('unit', S.unit);
+    setPressed('scaletype', S.scaleType);
+    setPressed('radius', S.radiusMode);
+    $('singleScaleField').classList.toggle('hidden', S.scaleType!=='single');
+    $('multiScaleFields').classList.toggle('hidden', S.scaleType!=='multi');
+    $('radiusFields').classList.toggle('hidden', S.radiusMode!=='curved');
+    $('exag').value = S.exag; $('exagVal').textContent = S.exag+'×'; paintRange($('exag'));
+    $('spinBtn').setAttribute('aria-pressed', String(!!S.spin));
+    setView(S.view, true);
+  }
+
+  // ================================================================
+  //  RENDERING
+  // ================================================================
+  let currentModel = null;
+  let lastPerpN = -1;
+  let pending = false;
+  function schedule(){ if(pending) return; pending = true; requestAnimationFrame(()=>{ pending=false; rebuild(); }); }
 
   function rebuild(){
     const p = getParams();
-
     if(p.numFrets !== lastPerpN){
       populatePerpOptions(p.numFrets);
       lastPerpN = p.numFrets;
-      p.perpChoice = p.multiscale ? ($('perpFret').value || 'nut') : 'nut';
+      p.perpChoice = p.multiscale ? S.perpChoice : 'nut';
     }
 
     const perpT = rawPerp(p.trebleScale, p.perpChoice, p.numFrets);
@@ -1055,73 +1292,433 @@
 
     const treble = edgeModel(p.trebleScale, p, G - perpT);
     const bass   = p.multiscale ? edgeModel(p.bassScale, p, G - perpB) : treble;
-
-    // Perpendicular-fret x-position (identical on both edges by construction),
-    // and the trapezoid board width there (Option A: exact scales at heel end).
-    const maxXall = Math.max(
-      ...treble.polygon.map(v=>v.x), ...bass.polygon.map(v=>v.x)
-    );
+    const maxXall = Math.max(...treble.polygon.map(v=>v.x), ...bass.polygon.map(v=>v.x));
     const widthAtPerp = p.nutWidth + (p.heelWidth - p.nutWidth) * (maxXall>0 ? G/maxXall : 0);
-    currentModel = { treble, bass, multiscale:p.multiscale, params:p,
-                     perpX:G, maxXall, widthAtPerp };
+    currentModel = { treble, bass, multiscale:p.multiscale, params:p, perpX:G, maxXall, widthAtPerp };
+    currentModel.tris = loftToSTL(currentModel);
+    currentModel.volume = meshVolume(currentModel.tris);
 
-    // Button visibility: single scale shows one SVG/DXF/PDF; multiscale shows
-    // dedicated Treble/Bass SVG + DXF buttons (each a single-click download,
-    // so browsers never block them), and hides PDF (single-scale 1:1 only).
-    // STEP and STL are always available.
-    const ms = p.multiscale;
-    $('btnSvgSingle').classList.toggle('hidden', ms);
-    $('btnDxfSingle').classList.toggle('hidden', ms);
-    $('btnPdf').classList.toggle('hidden', ms);
-    $('btnSvgTreble').classList.toggle('hidden', !ms);
-    $('btnSvgBass').classList.toggle('hidden', !ms);
-    $('btnDxfTreble').classList.toggle('hidden', !ms);
-    $('btnDxfBass').classList.toggle('hidden', !ms);
+    renderWarnings(currentModel);
+    renderStats(currentModel);
+    renderExports(currentModel);
+    renderReadout(currentModel);
+    renderStepRead(currentModel);
+    renderRadiusReadout(currentModel);
+    renderFretTable(currentModel);
+    if(S.view==='profile') renderProfile(currentModel);
+    update3D(currentModel);
+    save();
+  }
+
+  function meshVolume(tris){
+    let v = 0;
+    tris.forEach(([a,b,c])=>{ v += (a.x*(b.y*c.z - b.z*c.y) - a.y*(b.x*c.z - b.z*c.x) + a.z*(b.x*c.y - b.y*c.x)); });
+    return Math.abs(v/6);
+  }
+
+  function renderWarnings(m){
+    const p = m.params;
+    const set = (k, t) => { const w = $('w_'+k); if(w) w.textContent = t || ''; };
+    set('scaleLength',  !p.multiscale && p.trebleClamped ? 'Outside the 23–31 in range — using '+L(p.trebleScale) : '');
+    set('trebleScale',  p.multiscale && p.trebleClamped ? 'Outside the 23–31 in range — using '+L(p.trebleScale) : '');
+    set('bassScale',    p.multiscale && p.bassClamped   ? 'Outside the 23–31 in range — using '+L(p.bassScale) : '');
+    set('boardRadius',  p.radiusClamped ? 'Below the 7.25 in minimum — using '+L(p.boardRadius) : '');
+    set('bassScale',    $('w_bassScale').textContent || (p.multiscale && p.bassScale < p.trebleScale ? 'Bass is shorter than treble — the fan is reversed. Usually bass is the longer side.' : ''));
+    $('secScaleSub').textContent = p.multiscale ? 'fanned' : L(p.trebleScale, 1).replace(/\.0 mm$/,' mm');
+  }
+
+  function stat(k, v, unit, s, cls){
+    return `<div class="card stat ${cls||''}"><div class="k">${k}</div><div class="v">${v}${unit?`<small>${unit}</small>`:''}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
+  }
+  function renderStats(m){
+    const p = m.params, u = S.unit;
+    const ln = mm => u==='in' ? trimNum(mm/MM_PER_IN, 3) : trimNum(mm, 1);
+    const wood = WOODS.find(w=>w.id===S.wood) || WOODS[0];
+    const cm3 = m.volume/1000, grams = cm3 * wood.rho;
+    const totalLen = m.maxXall;
+    let html = '';
+    html += p.multiscale
+      ? stat('Scale', ln(p.trebleScale)+'–'+ln(p.bassScale), u, 'treble → bass', 'accent')
+      : stat('Scale', ln(p.trebleScale), u, u==='mm' ? (p.trebleScale/MM_PER_IN).toFixed(2)+' in' : (p.trebleScale).toFixed(1)+' mm', 'accent');
+    html += stat('Frets', String(p.numFrets), '', p.multiscale ? 'square at '+perpLabel(p.perpChoice).replace(' (fret 0)','') : 'steps');
+    html += stat('Board length', ln(totalLen), u, 'nut to heel end');
+    html += stat('Peak height', ln(p.baseThickness+p.fretHeight), u, 'trough '+ln(p.baseThickness)+' '+u);
+    html += stat('Volume', cm3.toFixed(1), 'cm³', p.radiused ? 'radiused' : 'flat top');
+    html += `<div class="card stat"><div class="k">Est. weight</div><div class="v">${grams.toFixed(0)}<small>g</small></div>
+      <select id="woodSel" aria-label="Material">${WOODS.map(w=>`<option value="${w.id}" ${w.id===wood.id?'selected':''}>${w.name}</option>`).join('')}</select></div>`;
+    $('stats').innerHTML = html;
+    $('woodSel').addEventListener('change', e=>{ S.wood = e.target.value; rebuild(); });
+  }
+
+  function renderExports(m){
+    const ms = m.multiscale;
+    $('svgActs').innerHTML = ms
+      ? '<button class="dl" data-export="svg-treble">Treble</button><button class="dl" data-export="svg-bass">Bass</button>'
+      : '<button class="dl" data-export="profile-svg">Download</button>';
+    $('dxfActs').innerHTML = ms
+      ? '<button class="dl" data-export="dxf-treble">Treble</button><button class="dl" data-export="dxf-bass">Bass</button>'
+      : '<button class="dl" data-export="profile-dxf">Download</button>';
+    $('svgDesc').textContent = ms ? 'One file per edge, in a shared coordinate system — pre-aligned in length for lofting.' : '2D side profile, 1 unit = 1 mm, with origin datum.';
+    $('dxfDesc').textContent = ms ? 'Treble and bass edge polylines with datum and perpendicular-fret tick.' : '2D side profile as a closed polyline for CAD/CAM.';
+    $('btnPdf').disabled = ms;
+    $('pdfTile').classList.toggle('off', ms);
+    $('pdfDesc').textContent = ms ? 'Single scale only — a fanned board has no single side view.' : 'Side profile drawn at true 1:1 scale.';
+  }
+
+  function renderStepRead(m){
+    const p = m.params;
+    $('stepRead').innerHTML =
+      `<div><span>Trough height</span><b>${L(p.baseThickness)}</b></div>` +
+      `<div><span>Peak height</span><b>${L(p.baseThickness + p.fretHeight)}</b></div>`;
+  }
+
+  function renderReadout(model){
+    const p = model.params;
+    const rows = [];
+    const hdr = t => rows.push({hdr:t});
+    const row = (k,v,w) => rows.push({k,v,w});
+    hdr('Scale');
+    if(p.multiscale){
+      row('Treble scale', L(p.trebleScale), p.trebleClamped);
+      row('Bass scale', L(p.bassScale), p.bassClamped);
+      row('Fan (bass − treble)', L(p.bassScale-p.trebleScale));
+      row('Perpendicular at', perpLabel(p.perpChoice));
+      row('Treble profile length', L(model.treble.totalLength));
+      row('Bass profile length', L(model.bass.totalLength));
+      hdr('Loft setup (manual Fusion build)');
+      row('Sketch separation (= heel width)', L(p.heelWidth));
+      row('Perp-fret x (align both sketches)', L(model.perpX||0));
+      row('Board width at perp fret', L(model.widthAtPerp||0));
+    } else {
+      row('Scale length', L(p.trebleScale), p.trebleClamped);
+      row('Total profile length', L(model.treble.totalLength));
+      row('Fret 12 position', L(model.treble.fretX[Math.min(12,p.numFrets)]));
+    }
+    hdr('Section');
+    row('Trough (low) height', L(p.baseThickness));
+    row('Peak (fret contact) height', L(p.baseThickness + p.fretHeight));
+    row('Nut width', L(p.nutWidth));
+    row('Heel width', L(p.heelWidth));
+    if(p.radiused){
+      const s = radiusInfo(p);
+      row('Radius', (p.boardRadius/MM_PER_IN).toFixed(2)+' in', p.radiusClamped);
+      row('Edge drop at heel', L(s.sagMax), s.breach);
+    }
+    $('readout').innerHTML = rows.map(r => r.hdr
+      ? `<div class="hdr">${r.hdr}</div>`
+      : `<div class="r${r.w?' warn':''}"><span>${r.k}${r.w?' (clamped)':''}</span><b>${r.v}</b></div>`).join('');
 
     $('previewNote').innerHTML = p.multiscale
-      ? 'Multiscale preview: cyan = treble edge, amber = bass edge. <b>Easiest route: download the STEP</b> — it is the complete fanned solid, no sketch alignment needed. If you would rather build it by hand, use the <b>SVG·Treble</b> / <b>SVG·Bass</b> (or DXF) buttons; both are in one shared coordinate system, so import them onto the Fusion origin and they are pre-aligned in length, then separate the sketch planes by the <b>heel width</b>, loft, and cut the trapezoid taper. PDF is single-scale only.'
-      : 'Closed 2D profile: nut → sawtooth through every fret → heel → straight back along the bottom. SVG, DXF and PDF are the exact 2D side profile (PDF at true 1:1). <b>STEP</b> is the tapered solid as a real B-rep body. STL is the same geometry as a watertight mesh.';
-
-    renderProfile(currentModel);
-    renderReadout(currentModel);
-    renderFretTable(currentModel);
-    renderRadiusReadout(currentModel);
+      ? '<b>Easiest route: download the STEP</b> — it is the complete fanned solid, no sketch alignment needed. To build by hand instead, use the Treble / Bass SVG or DXF files: both share one coordinate system, so import them onto the Fusion origin and they are pre-aligned in length. Separate the sketch planes by the <b>heel width</b>, loft, then cut the trapezoid taper.'
+      : 'The closed 2D profile runs nut → sawtooth through every fret → heel → straight back along the bottom. SVG, DXF and PDF are that exact profile (PDF at true 1:1). <b>STEP</b> is the tapered solid as a real B-rep body; <b>STL</b> is the same geometry as a watertight mesh.';
   }
 
-  // Radius readout + safety check. The deepest cut is at the widest section
-  // (heel width). If that edge drop (sagitta) meets or exceeds the base
-  // thickness, the arc would breach the flat bottom -> warn and (in build) clamp.
-  function renderRadiusReadout(model){
-    const el = $('radiusReadout');
-    if(!el) return;
-    const p = model.params;
-    if(!p.radiused){ el.innerHTML=''; return; }
-    const boardW = Math.max(p.nutWidth, p.heelWidth);
-    const half = boardW/2;
-    const R = p.boardRadius;
+  function radiusInfo(p){
+    const half = Math.max(p.nutWidth, p.heelWidth)/2, R = p.boardRadius;
     const sagMax = (R*R - half*half) <= 0 ? R : (R - Math.sqrt(R*R - half*half));
-    const breach = sagMax >= p.baseThickness;
-    const rows = [
-      ['Radius', (R/MM_PER_IN).toFixed(2)+' in  ('+R.toFixed(1)+' mm)', R<=MIN_RADIUS_MM+1e-6],
-      ['Arc facets', String(p.arcFacets), false],
-      ['Edge drop at heel (sagitta)', sagMax.toFixed(2)+' mm', breach],
-      ['Min thickness at edge', Math.max(0, p.baseThickness - sagMax).toFixed(2)+' mm', breach],
-    ];
-    el.innerHTML = '';
-    rows.forEach(r=>{
-      const d = document.createElement('div');
-      d.className = 'r' + (r[2] ? ' warn' : '');
-      d.innerHTML = `<span>${r[0]}</span><b>${r[1]}</b>`;
-      el.appendChild(d);
+    return {sagMax, breach: sagMax >= p.baseThickness};
+  }
+  function renderRadiusReadout(model){
+    const p = model.params;
+    if(!p.radiused){ $('radiusRead').innerHTML=''; $('radiusAlert').innerHTML=''; return; }
+    const {sagMax, breach} = radiusInfo(p);
+    $('radiusRead').innerHTML =
+      `<div><span>Radius</span><b>${(p.boardRadius/MM_PER_IN).toFixed(2)} in</b></div>` +
+      `<div class="${breach?'warn':''}"><span>Edge drop at heel</span><b>${L(sagMax)}</b></div>` +
+      `<div class="${breach?'warn':''}"><span>Min. edge thickness</span><b>${L(Math.max(0, p.baseThickness - sagMax))}</b></div>` +
+      `<div><span>Arc facets</span><b>${p.arcFacets}</b></div>`;
+    $('radiusAlert').innerHTML = breach
+      ? '<div class="alert">⚠ The edge drop is more than the base thickness. Increase the base thickness or the radius — the export clamps the curve to keep a solid board.</div>' : '';
+  }
+
+  function renderFretTable(model){
+    const p = model.params;
+    const tx = model.treble.fretX, bx = model.bass.fretX;
+    const u = S.unit;
+    const perpK = p.perpChoice==='nut' ? 0 : parseInt(p.perpChoice);
+    let html;
+    if(p.multiscale){
+      html = `<table><thead><tr><th>Fret</th><th>Treble x (${u})</th><th>Bass x (${u})</th><th>Fan Δx (${u})</th></tr></thead><tbody>`;
+      for(let k=0;k<=p.numFrets;k++){
+        html += `<tr class="${k===perpK?'perp':''}"><td>${k===0?'Nut':k}${k===perpK?' ⟂':''}</td><td>${Lnum(tx[k])}</td><td>${Lnum(bx[k])}</td><td>${Lnum(bx[k]-tx[k])}</td></tr>`;
+      }
+    } else {
+      html = `<table><thead><tr><th>Fret</th><th>From nut (${u})</th><th>Fret-to-fret (${u})</th><th>To bridge (${u})</th></tr></thead><tbody>`;
+      for(let k=0;k<=p.numFrets;k++){
+        const gap = k===0 ? '—' : Lnum(tx[k]-tx[k-1]);
+        html += `<tr><td>${k===0?'Nut':k}</td><td>${Lnum(tx[k])}</td><td>${gap}</td><td>${Lnum(p.trebleScale - tx[k])}</td></tr>`;
+      }
+    }
+    html += '</tbody></table>';
+    $('fretTableWrap').innerHTML = html;
+  }
+  function fretCSV(model){
+    const p = model.params, tx = model.treble.fretX, bx = model.bass.fretX, u = S.unit;
+    const lines = p.multiscale ? [`fret,treble_${u},bass_${u},fan_${u}`] : [`fret,from_nut_${u},fret_to_fret_${u},to_bridge_${u}`];
+    for(let k=0;k<=p.numFrets;k++){
+      lines.push(p.multiscale
+        ? [k, Lnum(tx[k]), Lnum(bx[k]), Lnum(bx[k]-tx[k])].join(',')
+        : [k, Lnum(tx[k]), k===0?'':Lnum(tx[k]-tx[k-1]), Lnum(p.trebleScale - tx[k])].join(','));
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  // ---------- 2D side profile (pixel-space so text stays crisp) ----------
+  const NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs, text){
+    const el = document.createElementNS(NS, tag);
+    for(const k in attrs) el.setAttribute(k, attrs[k]);
+    if(text != null) el.textContent = text;
+    return el;
+  }
+  let profileMap = null;
+  function renderProfile(model){
+    const svg = $('profileSVG');
+    const pane = $('profilePane');
+    const W = Math.max(300, pane.clientWidth - 36);
+    const E = S.exag;
+    const edges = model.multiscale ? [model.bass, model.treble] : [model.treble];
+    const all = [].concat(...edges.map(e=>e.polygon));
+    const minX = Math.min(...all.map(p=>p.x)), maxX = Math.max(...all.map(p=>p.x));
+    const maxZ = Math.max(...all.map(p=>p.z));
+    const padL = 8, padR = 8, padT = 30, padB = 26;
+    const k = (W - padL - padR) / (maxX - minX);
+    const availH = Math.max(120, pane.clientHeight - 110);
+    const kz = Math.min(k * E, (availH - padT - padB) / maxZ);   // keep it on screen
+    const H = maxZ*kz + padT + padB;
+    const X = x => padL + (x - minX)*k;
+    const Z = z => padT + (maxZ - z)*kz;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('height', H);
+    svg.innerHTML = '';
+    const css = getComputedStyle(document.documentElement);
+    const accent = css.getPropertyValue('--accent').trim(), teal = css.getPropertyValue('--teal').trim();
+    const ink3 = css.getPropertyValue('--ink-3').trim(), line = css.getPropertyValue('--line').trim();
+
+    const defs = svgEl('defs', {});
+    defs.innerHTML = `<linearGradient id="gT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${teal}" stop-opacity=".35"/><stop offset="1" stop-color="${teal}" stop-opacity=".03"/></linearGradient>
+      <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${accent}" stop-opacity=".30"/><stop offset="1" stop-color="${accent}" stop-opacity=".02"/></linearGradient>`;
+    svg.appendChild(defs);
+
+    // baseline + fret guides
+    svg.appendChild(svgEl('line', {x1:X(minX), y1:Z(0), x2:X(maxX), y2:Z(0), stroke:line, 'stroke-width':1}));
+    model.treble.fretX.forEach((fx,i)=>{
+      if(i===0) return;
+      svg.appendChild(svgEl('line', {x1:X(fx), y1:padT-14, x2:X(fx), y2:Z(0), stroke:line, 'stroke-width':1, 'stroke-dasharray':'2 3'}));
     });
-    if(breach){
-      const w = document.createElement('div');
-      w.className = 'r warn';
-      w.innerHTML = '<span style="color:var(--red)">⚠ Edge drop exceeds base thickness — increase base thickness or radius. Build will clamp to keep a solid.</span>';
-      el.appendChild(w);
+    // edges
+    edges.forEach(edge=>{
+      const isT = edge === model.treble;
+      const color = (model.multiscale && !isT) ? accent : teal;
+      svg.appendChild(svgEl('polygon', {
+        points: edge.polygon.map(p=>X(p.x).toFixed(2)+','+Z(p.z).toFixed(2)).join(' '),
+        fill: (model.multiscale && !isT) ? 'url(#gB)' : 'url(#gT)',
+        stroke: color, 'stroke-width':1.6, 'stroke-linejoin':'round'
+      }));
+    });
+    // perpendicular fret
+    if(model.multiscale){
+      svg.appendChild(svgEl('line', {x1:X(model.perpX), y1:padT-18, x2:X(model.perpX), y2:Z(0)+6, stroke:accent, 'stroke-width':1.5, 'stroke-dasharray':'5 4'}));
+      svg.appendChild(svgEl('text', {x:X(model.perpX)+5, y:Z(0)+18, fill:accent, 'font-size':11, 'font-family':'Space Grotesk, sans-serif', 'font-weight':600}, '⟂ '+perpLabel(model.params.perpChoice)));
+    }
+    // fret numbers (show every one if there is room, otherwise thin out)
+    const fx = model.treble.fretX;
+    const minGapPx = Math.min(...fx.slice(1).map((x,i)=> (x - fx[i])*k));
+    const every = minGapPx > 16 ? 1 : (minGapPx > 9 ? 2 : 3);
+    fx.forEach((x,i)=>{
+      if(i===0) return;
+      if(!(i===1 || i % every === 0 || i===fx.length-1)) return;
+      svg.appendChild(svgEl('text', {x:X(x), y:padT-18, 'text-anchor':'middle', fill: i===12||i===24 ? accent : ink3, 'font-size':10.5, 'font-family':'JetBrains Mono, monospace', 'font-weight': i===12||i===24 ? 700 : 500}, String(i)));
+    });
+    svg.appendChild(svgEl('text', {x:X(0)+2, y:Z(0)+18, fill:ink3, 'font-size':11, 'font-family':'Space Grotesk, sans-serif'}, 'nut'));
+    svg.appendChild(svgEl('text', {x:X(maxX)-2, y:Z(0)+18, fill:ink3, 'font-size':11, 'text-anchor':'end', 'font-family':'Space Grotesk, sans-serif'}, 'heel · '+L(maxX - minX, 1)));
+    // hover cursor
+    const cursor = svgEl('line', {x1:0, y1:padT-8, x2:0, y2:Z(0), stroke:accent, 'stroke-width':1, opacity:0});
+    svg.appendChild(cursor);
+    profileMap = {X, k, minX, padL, cursor, H};
+
+    // legend
+    const p = model.params;
+    $('legend').innerHTML = model.multiscale
+      ? `<span><i style="background:${teal}"></i>Treble edge · ${L(p.trebleScale,1)}</span><span><i style="background:${accent}"></i>Bass edge · ${L(p.bassScale,1)}</span>`
+      : `<span><i style="background:${teal}"></i>Side profile · ${L(p.trebleScale,1)} scale</span><span style="color:var(--ink-3)">Height shown ${S.exag}× · ${p.numFrets} steps</span>`;
+  }
+
+  function profileHover(e){
+    if(!profileMap || !currentModel) return;
+    const svg = $('profileSVG'), tip = $('tip');
+    const rect = svg.getBoundingClientRect();
+    const sx = (e.clientX - rect.left) * (svg.viewBox.baseVal.width / rect.width);
+    const xmm = profileMap.minX + (sx - profileMap.padL)/profileMap.k;
+    const m = currentModel, tx = m.treble.fretX;
+    // nearest fret on the treble edge
+    let best = 0;
+    tx.forEach((x,i)=>{ if(Math.abs(x - xmm) < Math.abs(tx[best] - xmm)) best = i; });
+    const px = profileMap.X(tx[best]);
+    profileMap.cursor.setAttribute('x1', px); profileMap.cursor.setAttribute('x2', px); profileMap.cursor.setAttribute('opacity', .9);
+    const p = m.params;
+    const fromNut = tx[best] - tx[0];
+    let html = `<b>${best===0 ? 'Nut' : 'Fret '+best}</b><br>`;
+    if(m.multiscale){
+      const bx = m.bass.fretX;
+      html += `<span class="num">treble ${L(fromNut)} · bass ${L(bx[best]-bx[0])}</span>`;
+    } else {
+      html += `<span class="num">${L(fromNut)} from nut</span>`;
+      if(best>0) html += `<br><span class="num">${L(tx[best]-tx[best-1])} from fret ${best-1 || 'nut'}</span>`;
+    }
+    tip.innerHTML = html;
+    const paneRect = $('profilePane').getBoundingClientRect();
+    tip.style.left = Math.min(paneRect.width - 90, Math.max(90, (px * rect.width / svg.viewBox.baseVal.width) + rect.left - paneRect.left)) + 'px';
+    tip.style.top = (rect.top - paneRect.top + 8) + 'px';
+    tip.classList.add('on');
+  }
+  function profileLeave(){
+    $('tip').classList.remove('on');
+    if(profileMap) profileMap.cursor.setAttribute('opacity', 0);
+  }
+
+  // ================================================================
+  //  3D PREVIEW (three.js, hand-rolled orbit camera)
+  // ================================================================
+  const G3 = { ok:false };
+  function init3D(){
+    if(!window.THREE){ $('glFallback').classList.remove('hidden'); $('glHint').classList.add('hidden'); return; }
+    try{
+      const canvas = $('glCanvas');
+      const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(32, 1, 1, 20000);
+      scene.add(new THREE.HemisphereLight(0xfff4e6, 0x20242c, 0.75));
+      const key = new THREE.DirectionalLight(0xffffff, 0.85); key.position.set(-300, 500, 400); scene.add(key);
+      const rim = new THREE.DirectionalLight(0xffd59a, 0.5); rim.position.set(400, 150, -500); scene.add(rim);
+      const group = new THREE.Group(); scene.add(group);
+      Object.assign(G3, {ok:true, renderer, scene, camera, group, canvas,
+        orbit:{theta:-0.55, phi:1.12, r:700, tx:0, ty:0, tz:0}, size:600, dirty:true, pointers:new Map()});
+      bindOrbit(canvas);
+      new ResizeObserver(resize3D).observe($('stage'));
+      resize3D();
+      requestAnimationFrame(loop3D);
+    }catch(err){
+      console.error(err);
+      $('glFallback').textContent = '3D preview is not available in this browser (WebGL is off). All exports still work.';
+      $('glFallback').classList.remove('hidden'); $('glHint').classList.add('hidden');
     }
   }
+  function resize3D(){
+    if(!G3.ok) return;
+    const st = $('stage');
+    const w = st.clientWidth, h = st.clientHeight;
+    if(!w || !h) return;
+    G3.renderer.setSize(w, h, false);
+    G3.camera.aspect = w/h; G3.camera.updateProjectionMatrix();
+    G3.dirty = true;
+    if(S.view==='profile' && currentModel) renderProfile(currentModel);
+  }
+  function update3D(model){
+    if(!G3.ok) return;
+    const E = S.exag;
+    const tris = model.tris;
+    // CAD (x length, y width, z up)  ->  three (x, z*E, -y): a pure rotation, keeps winding.
+    let minX=Infinity, maxX=-Infinity;
+    tris.forEach(t=>t.forEach(v=>{ if(v.x<minX)minX=v.x; if(v.x>maxX)maxX=v.x; }));
+    const cx = (minX+maxX)/2;
+    const pos = new Float32Array(tris.length*9);
+    let i = 0;
+    tris.forEach(t=>t.forEach(v=>{ pos[i++] = v.x - cx; pos[i++] = v.z*E; pos[i++] = -v.y; }));
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    const wood = WOODS.find(w=>w.id===S.wood) || WOODS[0];
+    const mat = new THREE.MeshStandardMaterial({color:new THREE.Color(wood.color).convertSRGBToLinear(), roughness:0.5, metalness:0.05, flatShading:true});
+    const mesh = new THREE.Mesh(geo, mat);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28),
+      new THREE.LineBasicMaterial({color:new THREE.Color(0xf2b766).convertSRGBToLinear(), transparent:true, opacity: wood.id==='maple' ? 0.5 : 0.45}));
+    // dispose the old board
+    G3.group.children.slice().forEach(c=>{ c.geometry.dispose(); c.material.dispose(); G3.group.remove(c); });
+    G3.group.add(mesh); G3.group.add(edges);
+    // ground shadow-ish disc
+    const len = maxX - minX;
+    if(Math.abs(len - G3.size) > len*0.25 || !G3.fitted){ G3.size = len; fit3D(); G3.fitted = true; }
+    G3.size = len;
+    $('glBadge').textContent = model.tris.length.toLocaleString()+' facets · height '+E+'×';
+    G3.dirty = true;
+  }
+  function fit3D(){
+    if(!G3.ok) return;
+    Object.assign(G3.orbit, {theta:-0.6, phi:1.08, r:G3.size*0.95, tx:0, ty:0, tz:0});
+    G3.dirty = true;
+  }
+  function loop3D(){
+    requestAnimationFrame(loop3D);
+    if(!G3.ok || S.view!=='3d' || document.hidden) return;
+    const o = G3.orbit;
+    if(S.spin && !G3.dragging){ o.theta += 0.0025; G3.dirty = true; }
+    if(!G3.dirty) return;
+    o.phi = Math.min(Math.PI-0.05, Math.max(0.05, o.phi));
+    o.r = Math.min(G3.size*6, Math.max(G3.size*0.08, o.r));
+    const c = G3.camera;
+    c.position.set(o.tx + o.r*Math.sin(o.phi)*Math.sin(o.theta), o.ty + o.r*Math.cos(o.phi), o.tz + o.r*Math.sin(o.phi)*Math.cos(o.theta));
+    c.lookAt(o.tx, o.ty, o.tz);
+    G3.renderer.render(G3.scene, c);
+    G3.dirty = false;
+  }
+  function bindOrbit(cv){
+    const P = G3.pointers;
+    let mode = null, last = null, pinch = 0;
+    cv.addEventListener('contextmenu', e=>e.preventDefault());
+    cv.addEventListener('pointerdown', e=>{
+      cv.setPointerCapture(e.pointerId);
+      P.set(e.pointerId, {x:e.clientX, y:e.clientY});
+      G3.dragging = true;
+      if(P.size===2){ const [a,b] = [...P.values()]; pinch = Math.hypot(a.x-b.x, a.y-b.y); mode = 'pinch'; }
+      else mode = (e.button===2 || e.shiftKey) ? 'pan' : 'rot';
+      last = {x:e.clientX, y:e.clientY};
+    });
+    cv.addEventListener('pointermove', e=>{
+      if(!P.has(e.pointerId)) return;
+      P.set(e.pointerId, {x:e.clientX, y:e.clientY});
+      const o = G3.orbit;
+      if(mode==='pinch' && P.size===2){
+        const [a,b] = [...P.values()]; const d = Math.hypot(a.x-b.x, a.y-b.y);
+        if(pinch>0) o.r *= pinch/d; pinch = d;
+      } else if(mode==='rot'){
+        o.theta -= (e.clientX-last.x)*0.006; o.phi -= (e.clientY-last.y)*0.006;
+      } else if(mode==='pan'){
+        const s = o.r * 0.0016;
+        const dx = -(e.clientX-last.x)*s, dy = (e.clientY-last.y)*s;
+        o.tx += dx*Math.cos(o.theta); o.tz -= dx*Math.sin(o.theta); o.ty += dy;
+      }
+      last = {x:e.clientX, y:e.clientY};
+      G3.dirty = true;
+    });
+    const up = e=>{ P.delete(e.pointerId); if(P.size===0){ G3.dragging = false; mode = null; } else if(P.size===1){ mode='rot'; last = [...P.values()][0]; } };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', e=>{ e.preventDefault(); G3.orbit.r *= Math.exp(e.deltaY*0.0012); G3.dirty = true; }, {passive:false});
+    cv.addEventListener('dblclick', fit3D);
+  }
 
+  // ================================================================
+  //  VIEW TABS
+  // ================================================================
+  function setView(v, silent){
+    S.view = v;
+    document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-selected', String(b.dataset.view===v)));
+    $('glPane').classList.toggle('hidden', v!=='3d');
+    $('profilePane').classList.toggle('hidden', v!=='profile');
+    $('tablePane').classList.toggle('hidden', v!=='table');
+    $('exagCtl').classList.toggle('hidden', v==='table');
+    $('spinBtn').classList.toggle('hidden', v!=='3d');
+    $('viewResetBtn').classList.toggle('hidden', v!=='3d');
+    if(v==='profile' && currentModel) renderProfile(currentModel);
+    if(v==='3d') G3.dirty = true;
+    if(!silent) save();
+  }
+
+  // ================================================================
+  //  EXPORTS
+  // ================================================================
   function download(filename, content, mime){
     const blob = new Blob([content], {type:mime});
     const url = URL.createObjectURL(blob);
@@ -1130,53 +1727,54 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url), 1000);
   }
-
-  // Fire several downloads from one click. Browsers coalesce multiple
-  // programmatic downloads triggered in the same tick (keeping only the last),
-  // so we stagger them onto separate event-loop turns.
-  function downloadMany(files){
-    files.forEach((f, i)=>{
-      setTimeout(()=>download(f.name, f.content, f.mime), i * 400);
-    });
+  let toastTimer = 0;
+  function toast(text, bad){
+    const t = $('toast');
+    $('toastText').textContent = text;
+    t.classList.toggle('bad', !!bad);
+    t.classList.add('on');
+    clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('on'), 2600);
+  }
+  function setStatus(html, bad){
+    $('statusbar').classList.toggle('bad', !!bad);
+    $('statusText').innerHTML = html;
+  }
+  function baseName(m){
+    const p = m.params;
+    const sc = p.multiscale ? `${p.trebleScale.toFixed(0)}-${p.bassScale.toFixed(0)}mm` : `${p.trebleScale.toFixed(0)}mm`;
+    return `bond-fretboard-${sc}-${p.numFrets}f`;
   }
 
-  document.querySelectorAll('button[data-export]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(!currentModel || btn.disabled) return;
-      const kind = btn.dataset.export;
-      const m = currentModel;
-      if(kind==='profile-svg'){
-        download('bond-fretboard-profile.svg', edgeSVGString(m.treble, m, 'Side profile', '#0a8f8c'), 'image/svg+xml');
-      } else if(kind==='svg-treble'){
-        download('bond-fretboard-TREBLE.svg', edgeSVGString(m.treble, m, 'TREBLE edge', '#0a8f8c'), 'image/svg+xml');
-      } else if(kind==='svg-bass'){
-        download('bond-fretboard-BASS.svg', edgeSVGString(m.bass, m, 'BASS edge', '#b3791f'), 'image/svg+xml');
-      } else if(kind==='profile-dxf'){
-        download('bond-fretboard-profile.dxf', edgeDXFString(m.treble, m, 'PROFILE'), 'application/dxf');
-      } else if(kind==='dxf-treble'){
-        download('bond-fretboard-TREBLE.dxf', edgeDXFString(m.treble, m, 'PROFILE_TREBLE'), 'application/dxf');
-      } else if(kind==='dxf-bass'){
-        download('bond-fretboard-BASS.dxf', edgeDXFString(m.bass, m, 'PROFILE_BASS'), 'application/dxf');
-      } else if(kind==='profile-pdf'){
-        download('bond-fretboard-profile.pdf', profilePDF(m), 'application/pdf');
-      } else if(kind==='step'){
-        exportSTEP(m);
-      } else if(kind==='stl'){
-        const solidTris = loftToSTL(m);
-        download('bond-fretboard.stl', stlString(solidTris,'bond_fretboard'), 'model/stl');
-        setStatus('STL written: <b>'+solidTris.length.toLocaleString()+'</b> facets, watertight mesh, millimeters. Fusion will import this as a mesh body — use the STEP button if you want a real solid.', false);
-      }
-    });
+  document.addEventListener('click', e=>{
+    const btn = e.target.closest('button[data-export]');
+    if(!btn || btn.disabled || !currentModel) return;
+    const kind = btn.dataset.export;
+    const m = currentModel, b = baseName(m);
+    let file = null;
+    if(kind==='profile-svg'){ file = b+'-profile.svg'; download(file, edgeSVGString(m.treble, m, 'Side profile', '#0a8f8c'), 'image/svg+xml'); }
+    else if(kind==='svg-treble'){ file = b+'-TREBLE.svg'; download(file, edgeSVGString(m.treble, m, 'TREBLE edge', '#0a8f8c'), 'image/svg+xml'); }
+    else if(kind==='svg-bass'){ file = b+'-BASS.svg'; download(file, edgeSVGString(m.bass, m, 'BASS edge', '#b3791f'), 'image/svg+xml'); }
+    else if(kind==='profile-dxf'){ file = b+'-profile.dxf'; download(file, edgeDXFString(m.treble, m, 'PROFILE'), 'application/dxf'); }
+    else if(kind==='dxf-treble'){ file = b+'-TREBLE.dxf'; download(file, edgeDXFString(m.treble, m, 'PROFILE_TREBLE'), 'application/dxf'); }
+    else if(kind==='dxf-bass'){ file = b+'-BASS.dxf'; download(file, edgeDXFString(m.bass, m, 'PROFILE_BASS'), 'application/dxf'); }
+    else if(kind==='profile-pdf'){ file = b+'-profile-1to1.pdf'; download(file, profilePDF(m), 'application/pdf'); }
+    else if(kind==='step'){ exportSTEP(m, b+'.step'); return; }
+    else if(kind==='stl'){
+      file = b+'.stl';
+      download(file, stlString(m.tris,'bond_fretboard'), 'model/stl');
+      setStatus('STL written: <b>'+m.tris.length.toLocaleString()+'</b> facets, watertight mesh with outward-facing normals, millimeters. Fusion imports this as a mesh body — use STEP for a real solid.', false);
+    }
+    if(file) toast('Saved '+file);
   });
 
-  function exportSTEP(m){
+  function exportSTEP(m, filename){
     const t0 = performance.now();
     try{
       const st = buildStations(m);
       const brep = brepFromStations(st);
       const chk = validateBrep(brep.faces);
       const text = stepString(brep.verts, brep.faces, 'bond_fretboard');
-      download('bond-fretboard.step', text, 'model/step');
+      download(filename, text, 'model/step');
       const ms = (performance.now()-t0).toFixed(0);
       const kb = (text.length/1024).toFixed(0);
       const exact = !m.params.radiused;
@@ -1185,63 +1783,72 @@
               + '<b>'+chk.edges.toLocaleString()+'</b> edges, '
               + 'volume <b>'+(brep.volume/1000).toFixed(2)+' cm³</b>, '+kb+' KB. ';
       if(chk.nonManifold){
-        msg += '<span style="color:var(--red)">⚠ '+chk.nonManifold+' non-manifold edge(s) — the solid may fail to knit. Report this parameter set.</span>';
-        setStatus(msg, true);
+        msg += '⚠ '+chk.nonManifold+' non-manifold edge(s) — the solid may fail to knit. Try slightly different settings.';
+        setStatus(msg, true); toast('STEP saved with warnings', true);
       } else {
         msg += 'Topology check: <b>manifold, closed shell</b>. '
-            + (exact
-                ? 'Flat board — geometry is <b>mathematically exact</b>.'
-                : 'Radiused — the arc is faceted into <b>'+m.params.arcFacets+'</b> planar strips across the width (still a genuine solid). Drop arc facets to 8–12 for lighter topology.')
+            + (exact ? 'Flat board — geometry is <b>mathematically exact</b>.'
+                     : 'Radiused — the arc is faceted into <b>'+m.params.arcFacets+'</b> planar strips across the width (still a genuine solid). Drop arc facets to 8–12 for lighter topology.')
             + ' Open in Fusion via File → Open, or Insert → Insert Derive.';
-        setStatus(msg, false);
+        setStatus(msg, false); toast('Saved '+filename);
       }
-      console.log('[STEP]', {faces:brep.faces.length, verts:brep.verts.length, edges:chk.edges,
-                             nonManifold:chk.nonManifold, volume_mm3:brep.volume, bytes:text.length});
     } catch(err){
-      setStatus('<span style="color:var(--red)">STEP export failed: '+String(err && err.message || err)+'</span>', true);
+      setStatus('STEP export failed: '+String(err && err.message || err), true);
+      toast('STEP export failed', true);
       console.error(err);
     }
   }
 
-  // unit toggle
-  document.querySelectorAll('.toggle-btn[data-unit]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.toggle-btn[data-unit]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      unit = btn.dataset.unit;
-      document.querySelectorAll('.u-len').forEach(u=>u.textContent = unit);
-      rebuild();
-    });
+  // ================================================================
+  //  WIRING
+  // ================================================================
+  buildControls();
+  PRESETS.forEach((p,i)=>{ const o = document.createElement('option'); o.value = i; o.textContent = p.name; $('preset').appendChild(o); });
+  $('preset').addEventListener('change', e=>{
+    const p = PRESETS[e.target.value]; if(!p) return;
+    S.scaleType = p.st;
+    Object.assign(S.vals, p.v);
+    if(p.perp){ S.perpChoice = p.perp; lastPerpN = -1; }
+    syncModes(); syncAllControls(); rebuild();
+    toast('Loaded '+p.name);
+    e.target.value = '';
   });
 
-  // scale-type toggle
-  document.querySelectorAll('.toggle-btn[data-scaletype]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.toggle-btn[data-scaletype]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      scaleType = btn.dataset.scaletype;
-      $('singleScaleField').classList.toggle('hidden', scaleType!=='single');
-      $('multiScaleFields').classList.toggle('hidden', scaleType!=='multi');
-      rebuild();
-    });
+  document.querySelectorAll('[data-unit]').forEach(b=>b.addEventListener('click', ()=>{
+    S.unit = b.dataset.unit; syncModes(); syncAllControls(); rebuild();
+  }));
+  document.querySelectorAll('[data-scaletype]').forEach(b=>b.addEventListener('click', ()=>{
+    S.scaleType = b.dataset.scaletype; syncModes(); rebuild();
+  }));
+  document.querySelectorAll('[data-radius]').forEach(b=>b.addEventListener('click', ()=>{
+    S.radiusMode = b.dataset.radius; syncModes(); rebuild();
+  }));
+  $('perpFret').addEventListener('change', e=>{ S.perpChoice = e.target.value; rebuild(); });
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
+  document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click', ()=>$(b.dataset.help).classList.toggle('hidden')));
+  $('exag').addEventListener('input', e=>{ S.exag = parseInt(e.target.value); $('exagVal').textContent = S.exag+'×'; paintRange(e.target); schedule(); });
+  $('spinBtn').addEventListener('click', ()=>{ S.spin = !S.spin; $('spinBtn').setAttribute('aria-pressed', String(S.spin)); save(); });
+  $('viewResetBtn').addEventListener('click', fit3D);
+  $('csvBtn').addEventListener('click', ()=>{ if(!currentModel) return; const f = baseName(currentModel)+'-frets.csv'; download(f, fretCSV(currentModel), 'text/csv'); toast('Saved '+f); });
+  $('themeBtn').addEventListener('click', ()=>{
+    theme = theme==='dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = theme;
+    try{ localStorage.setItem('stepboard.theme', theme); }catch(e){}
+    if(currentModel && S.view==='profile') renderProfile(currentModel);
   });
-
-  // radius toggle
-  document.querySelectorAll('.toggle-btn[data-radius]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.toggle-btn[data-radius]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      radiusMode = btn.dataset.radius;
-      $('radiusFields').classList.toggle('hidden', radiusMode!=='curved');
-      rebuild();
-    });
+  $('resetBtn').addEventListener('click', ()=>{
+    if(!confirm('Reset every setting to its default?')) return;
+    S = DEFAULT_STATE(); lastPerpN = -1;
+    syncModes(); syncAllControls(); rebuild(); fit3D();
+    toast('Settings reset');
   });
+  const svgEl2 = $('profileSVG');
+  svgEl2.addEventListener('pointermove', profileHover);
+  svgEl2.addEventListener('pointerleave', profileLeave);
 
-  document.querySelectorAll('input[type=number]').forEach(inp=>{
-    inp.addEventListener('input', rebuild);
-  });
-  $('perpFret').addEventListener('change', rebuild);
-
+  syncModes();
+  syncAllControls();
+  init3D();
   rebuild();
 })();
 </script>
