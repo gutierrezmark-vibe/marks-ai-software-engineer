@@ -146,7 +146,10 @@
     font-family:var(--mono); font-size:13px; padding:7px 9px; border-radius:8px; outline:none; text-align:right;
   }
   .ctl-row input[type=number]:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+  .ctl-hint{font-size:11.5px; color:var(--ink-3); margin:-4px 0 6px;}
   .ctl-warn{font-size:11.5px; color:var(--rose); margin-top:6px;}
+  .step-diagram{background:var(--panel-2); border:1px solid var(--line-soft); border-radius:9px; padding:8px 6px 4px;}
+  .step-diagram svg{width:100%; height:auto; display:block;}
   .ctl-warn:empty{display:none;}
   .two{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .two .ctl-row{grid-template-columns:1fr;}
@@ -399,12 +402,12 @@
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto"><path d="M6 9l6 6 6-6"/></svg>
       </summary>
       <div class="sec-body">
-        <div class="ctl" data-key="baseThickness"></div>
+        <div class="step-diagram" id="stepRead" aria-label="Diagram of one step"></div>
+        <div class="ctl" data-key="fullHeight"></div>
         <div class="ctl" data-key="fretHeight"></div>
-        <div class="mini-read" id="stepRead"></div>
-        <button class="help-toggle" data-help="helpStep">ⓘ What the step looks like</button>
+        <button class="help-toggle" data-help="helpStep">ⓘ How the steps are shaped</button>
         <div class="help hidden" id="helpStep">
-          Each step is a right triangle: a <b>vertical wall</b> at the fret position (the string-contact edge) rising by the fret contact height, then a <b>straight slope</b> back down to the base of the next fret's wall. Base thickness is measured to the low point (trough). The nut region before fret 1 is flat at trough height — there's no zero-fret step.
+          At every fret position the board has a <b>square edge</b> that stands up by the <b>step height</b> — that edge does the job of a fret, and it's what the string presses against. Behind each edge the surface ramps straight down to the next fret. <b>Full height</b> is the board at its thickest (the top of any step), measured from the flat back. The <b>thinnest point</b> is the bottom of each ramp, right before the next edge: full height minus step height. Most boards land around 5–6&nbsp;mm full height. The area between the nut and fret 1 is flat at the thinnest height.
         </div>
       </div>
     </details>
@@ -568,8 +571,10 @@
     bassScale:     {label:'Bass scale (low E)',    len:true, def:686,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
     numFrets:      {label:'Number of frets',       len:false,def:22,     min:1,   max:36,  step:1},
     overhang:      {label:'Length past last fret', len:true, def:18,     min:0.5, max:80,  step:0.1},
-    baseThickness: {label:'Base thickness (to trough)', len:true, def:8, min:0.5, max:25,  step:0.1},
-    fretHeight:    {label:'Fret contact height',   len:true, def:1.0,    min:0.05,max:5,   step:0.05},
+    fullHeight:    {label:'Full height',           len:true, def:6.0,    min:2,   max:15,  step:0.1,
+                    hint:'Back of the board to the top of a step'},
+    fretHeight:    {label:'Step height',           len:true, def:1.0,    min:0.1, max:4,   step:0.05,
+                    hint:'How tall each step stands — what the string rests on'},
     nutWidth:      {label:'Nut width',             len:true, def:43,     min:20,  max:90,  step:0.1},
     heelWidth:     {label:'Heel width',            len:true, def:57,     min:20,  max:110, step:0.1},
     boardRadius:   {label:'Radius',                len:true, def:304.8,  min:MIN_RADIUS_MM, max:1000, step:0.1},
@@ -582,6 +587,12 @@
     {id:'rosewood', name:'Indian rosewood',       rho:0.83, color:0x5b3424},
     {id:'pauferro', name:'Pau ferro',             rho:0.87, color:0x6e4a32},
     {id:'maple',    name:'Maple',                 rho:0.70, color:0xd9bb88},
+    {id:'aluminum', name:'Aluminum (6061)',       rho:2.70, color:0xb9bec6},
+    {id:'pla',      name:'PLA filament (solid)',  rho:1.24, color:0x2f6fb0},
+    {id:'petg',     name:'PETG filament (solid)', rho:1.27, color:0x2f8f6a},
+    {id:'abs',      name:'ABS filament (solid)',  rho:1.04, color:0xd9d4ca},
+    {id:'asa',      name:'ASA filament (solid)',  rho:1.07, color:0x8f8f8f},
+    {id:'cfnylon',  name:'Carbon-fiber nylon (solid)', rho:1.15, color:0x2a2c2f},
   ];
   const PRESETS = [
     {name:'Fender-style · 25.5″', st:'single', v:{scaleLength:647.7, numFrets:21, nutWidth:42.0, heelWidth:56.0, boardRadius:241.3}},
@@ -601,7 +612,14 @@
   let S = DEFAULT_STATE();
   try{
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if(saved && saved.vals){ S = Object.assign(DEFAULT_STATE(), saved); S.vals = Object.assign(DEFAULT_STATE().vals, saved.vals); }
+    if(saved && saved.vals){
+      S = Object.assign(DEFAULT_STATE(), saved);
+      // Older saves stored the thinnest point; convert to full height.
+      if(saved.vals.fullHeight == null && saved.vals.baseThickness != null)
+        saved.vals.fullHeight = saved.vals.baseThickness + (saved.vals.fretHeight || 1);
+      delete saved.vals.baseThickness;
+      S.vals = Object.assign(DEFAULT_STATE().vals, saved.vals);
+    }
   }catch(e){}
   function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
   let theme = 'dark';
@@ -754,14 +772,20 @@
     if(multiscale){ trebleRaw = num(v.trebleScale, 648); bassRaw = num(v.bassScale, 686); }
     else { trebleRaw = bassRaw = num(v.scaleLength, 648); }
     const tC = clampScale(trebleRaw), bC = clampScale(bassRaw);
+    // The builder sets full height + step height; the geometry wants the
+    // thinnest point (between steps). Keep at least 0.5 mm there.
+    const fretHeight = Math.max(0.01, num(v.fretHeight, 1));
+    const fullHeight = num(v.fullHeight, 6);
+    const thinnest = Math.max(0.5, fullHeight - fretHeight);
     return {
       multiscale, numFrets,
       perpChoice: multiscale ? (S.perpChoice || 'nut') : 'nut',
       trebleScale: tC.value, bassScale: bC.value,
       trebleClamped: tC.clamped, bassClamped: bC.clamped,
       overhang:      Math.max(0.1,  num(v.overhang, 18)),
-      baseThickness: Math.max(0.1,  num(v.baseThickness, 8)),
-      fretHeight:    Math.max(0.01, num(v.fretHeight, 1)),
+      baseThickness: thinnest,
+      fretHeight,
+      thinClamped: fullHeight - fretHeight < 0.5,
       nutWidth:      Math.max(0.1,  num(v.nutWidth, 43)),
       heelWidth:     Math.max(0.1,  num(v.heelWidth, 57)),
       radiused: (S.radiusMode === 'curved'),
@@ -1216,6 +1240,7 @@
       const key = el.dataset.key, spec = SPECS[key];
       el.innerHTML =
         `<div class="ctl-head"><label for="n_${key}">${spec.label}</label><span class="u">${unitOf(spec)}</span></div>` +
+        (spec.hint ? `<div class="ctl-hint">${spec.hint}</div>` : '') +
         `<div class="ctl-row"><input type="range" id="r_${key}" aria-label="${spec.label}"><input type="number" id="n_${key}" inputmode="decimal"></div>` +
         `<div class="ctl-warn" id="w_${key}"></div>`;
       const r = $('r_'+key), n = $('n_'+key);
@@ -1322,6 +1347,8 @@
     set('scaleLength',  !p.multiscale && p.trebleClamped ? 'Outside the 23–31 in range — using '+L(p.trebleScale) : '');
     set('trebleScale',  p.multiscale && p.trebleClamped ? 'Outside the 23–31 in range — using '+L(p.trebleScale) : '');
     set('bassScale',    p.multiscale && p.bassClamped   ? 'Outside the 23–31 in range — using '+L(p.bassScale) : '');
+    set('fretHeight',   p.thinClamped ? 'Step height is nearly the full height — the board would have no material left between steps. Using a 0.5 mm minimum.' : '');
+    set('fullHeight',   !p.thinClamped && p.baseThickness < 2 ? 'Only '+L(p.baseThickness)+' left between steps — that may be fragile.' : '');
     set('boardRadius',  p.radiusClamped ? 'Below the 7.25 in minimum — using '+L(p.boardRadius) : '');
     set('bassScale',    $('w_bassScale').textContent || (p.multiscale && p.bassScale < p.trebleScale ? 'Bass is shorter than treble — the fan is reversed. Usually bass is the longer side.' : ''));
     $('secScaleSub').textContent = p.multiscale ? 'fanned' : L(p.trebleScale, 1).replace(/\.0 mm$/,' mm');
@@ -1342,9 +1369,11 @@
       : stat('Scale', ln(p.trebleScale), u, u==='mm' ? (p.trebleScale/MM_PER_IN).toFixed(2)+' in' : (p.trebleScale).toFixed(1)+' mm', 'accent');
     html += stat('Frets', String(p.numFrets), '', p.multiscale ? 'square at '+perpLabel(p.perpChoice).replace(' (fret 0)','') : 'steps');
     html += stat('Board length', ln(totalLen), u, 'nut to heel end');
-    html += stat('Peak height', ln(p.baseThickness+p.fretHeight), u, 'trough '+ln(p.baseThickness)+' '+u);
+    html += stat('Full height', ln(p.baseThickness+p.fretHeight), u, 'thinnest '+ln(p.baseThickness)+' '+u);
     html += stat('Volume', cm3.toFixed(1), 'cm³', p.radiused ? 'radiused' : 'flat top');
+    const printed = /filament|nylon/i.test(wood.name);
     html += `<div class="card stat"><div class="k">Est. weight</div><div class="v">${grams.toFixed(0)}<small>g</small></div>
+      <div class="s" title="Real prints are usually lighter, depending on infill">${printed ? 'at 100% infill' : (grams/28.35).toFixed(1)+' oz'}</div>
       <select id="woodSel" aria-label="Material">${WOODS.map(w=>`<option value="${w.id}" ${w.id===wood.id?'selected':''}>${w.name}</option>`).join('')}</select></div>`;
     $('stats').innerHTML = html;
     $('woodSel').addEventListener('change', e=>{ S.wood = e.target.value; rebuild(); });
@@ -1367,9 +1396,36 @@
 
   function renderStepRead(m){
     const p = m.params;
-    $('stepRead').innerHTML =
-      `<div><span>Trough height</span><b>${L(p.baseThickness)}</b></div>` +
-      `<div><span>Peak height</span><b>${L(p.baseThickness + p.fretHeight)}</b></div>`;
+    const full = p.baseThickness + p.fretHeight;
+    const thinWarn = p.thinClamped || p.baseThickness < 2;
+    // Schematic (not to scale) of two steps with live dimensions.
+    $('stepRead').innerHTML = `
+      <svg viewBox="0 0 320 122" role="img" aria-label="Full height ${L(full)}, step height ${L(p.fretHeight)}, thinnest point ${L(p.baseThickness)}">
+        <defs><marker id="ah" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0 0L8 4L0 8z" fill="var(--ink-2)"/></marker></defs>
+        <polygon points="100,100 100,64 140,64 140,40 225,64 225,40 310,64 310,100"
+          fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>
+        <g stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="2 2">
+          <line x1="140" y1="40" x2="80" y2="40"/><line x1="100" y1="100" x2="80" y2="100"/>
+          <line x1="225" y1="40" x2="205" y2="40"/><line x1="225" y1="64" x2="205" y2="64"/>
+        </g>
+        <g stroke="var(--ink-2)" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)">
+          <line x1="86" y1="43" x2="86" y2="97"/>
+          <line x1="210" y1="43" x2="210" y2="61"/>
+          <line x1="120" y1="67" x2="120" y2="97"/>
+        </g>
+        <g font-family="Space Grotesk, sans-serif" font-size="11">
+          <text x="76" y="64" text-anchor="end" fill="var(--ink-2)">Full</text>
+          <text x="76" y="77" text-anchor="end" fill="var(--ink-2)">height</text>
+          <text x="76" y="92" text-anchor="end" fill="var(--accent)" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(full)}</text>
+          <text x="225" y="16" text-anchor="middle" fill="var(--ink-2)">Step height</text>
+          <text x="225" y="30" text-anchor="middle" fill="var(--accent)" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(p.fretHeight)}</text>
+          <text x="128" y="84" fill="var(--ink-2)">Thinnest point</text>
+          <text x="128" y="96" fill="${thinWarn ? 'var(--rose)' : 'var(--accent)'}" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(p.baseThickness)} ${S.unit}</text>
+          <text x="140" y="116" text-anchor="middle" fill="var(--ink-3)" font-size="10">fret edge</text>
+          <text x="310" y="116" text-anchor="end" fill="var(--ink-3)" font-size="10">toward bridge →</text>
+        </g>
+      </svg>`;
   }
 
   function renderReadout(model){
@@ -1395,8 +1451,9 @@
       row('Fret 12 position', L(model.treble.fretX[Math.min(12,p.numFrets)]));
     }
     hdr('Section');
-    row('Trough (low) height', L(p.baseThickness));
-    row('Peak (fret contact) height', L(p.baseThickness + p.fretHeight));
+    row('Full height (top of steps)', L(p.baseThickness + p.fretHeight));
+    row('Step height', L(p.fretHeight));
+    row('Thinnest point (between steps)', L(p.baseThickness), p.thinClamped);
     row('Nut width', L(p.nutWidth));
     row('Heel width', L(p.heelWidth));
     if(p.radiused){
@@ -1428,7 +1485,7 @@
       `<div class="${breach?'warn':''}"><span>Min. edge thickness</span><b>${L(Math.max(0, p.baseThickness - sagMax))}</b></div>` +
       `<div><span>Arc facets</span><b>${p.arcFacets}</b></div>`;
     $('radiusAlert').innerHTML = breach
-      ? '<div class="alert">⚠ The edge drop is more than the base thickness. Increase the base thickness or the radius — the export clamps the curve to keep a solid board.</div>' : '';
+      ? '<div class="alert">⚠ The radius drops the board edges more than the thinnest point allows. Increase the full height or the radius — the export clamps the curve to keep a solid board.</div>' : '';
   }
 
   function renderFretTable(model){
