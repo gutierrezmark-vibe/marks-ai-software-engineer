@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bond Stepped Fretboard — Profile Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+  :root{
+    --bg:        #0c141c;
+    --panel:     #121e29;
+    --panel-2:   #0f1922;
+    --line:      #223140;
+    --line-soft: #1a2733;
+    --ink:       #dbe6ee;
+    --ink-dim:   #7d93a3;
+    --ink-faint: #4c6070;
+    --cyan:      #5fe3e0;
+    --amber:     #ffb454;
+    --green:     #7ee787;
+    --red:       #ff6b6b;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --disp: 'Space Grotesk', var(--mono);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0/32px 32px,
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0/32px 32px,
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:13px;
+    min-height:100vh;
+  }
+  header{
+    padding:22px 28px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  header h1{
+    font-family:var(--disp);
+    font-size:20px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:.2px;
+    color:var(--ink);
+  }
+  header h1 span{color:var(--cyan);}
+  header p{
+    margin:0;
+    color:var(--ink-dim);
+    font-size:12px;
+    letter-spacing:.3px;
+  }
+  .wrap{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:1px;
+    background:var(--line);
+    min-height:calc(100vh - 78px);
+  }
+  @media (max-width:900px){ .wrap{grid-template-columns:1fr;} }
+
+  .panel{background:var(--panel);}
+  .form{padding:18px 20px 40px; overflow-y:auto;}
+
+  .group{margin-bottom:22px;}
+  .group-title{
+    font-family:var(--disp);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:1.6px;
+    text-transform:uppercase;
+    color:var(--cyan);
+    margin:0 0 10px;
+    padding-bottom:6px;
+    border-bottom:1px dashed var(--line);
+  }
+  label.field{display:block; margin-bottom:10px;}
+  label.field .l{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:11.5px; color:var(--ink-dim); margin-bottom:4px;
+  }
+  label.field .l .u{color:var(--ink-faint); font-size:10.5px;}
+  input[type=number], select{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:13px;
+    padding:7px 8px;
+    border-radius:3px;
+    outline:none;
+  }
+  input[type=number]:focus, select:focus{border-color:var(--cyan);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .toggle-row{display:flex; gap:8px; margin-bottom:14px;}
+  .toggle-btn{
+    flex:1; text-align:center; padding:7px 6px;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink-dim);
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.5px;
+    border-radius:3px; cursor:pointer; user-select:none;
+  }
+  .toggle-btn.active{ color:var(--bg); background:var(--cyan); border-color:var(--cyan); font-weight:600; }
+  .hint{font-size:10.5px; color:var(--ink-faint); margin-top:2px; line-height:1.55;}
+  .readout{background:var(--panel-2); border:1px solid var(--line); border-radius:4px; padding:10px 12px; margin-top:6px;}
+  .readout .r{display:flex; justify-content:space-between; font-size:11.5px; padding:3px 0; color:var(--ink-dim);}
+  .readout .r b{color:var(--cyan); font-weight:600;}
+  .readout .r.warn b{color:var(--red);}
+  .hidden{display:none !important;}
+
+  .main{padding:20px 24px 40px;}
+  .viewhead{display:flex; justify-content:space-between; align-items:center; margin:0 0 8px; flex-wrap:wrap; gap:8px;}
+  .viewhead h2{font-family:var(--disp); font-size:13px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; color:var(--ink); margin:0;}
+  .viewhead h2 small{color:var(--ink-faint); font-weight:400; text-transform:none; letter-spacing:0;}
+  .btns{display:flex; gap:8px; flex-wrap:wrap;}
+  button.dl{
+    background:transparent; border:1px solid var(--line); color:var(--ink-dim);
+    font-family:var(--mono); font-size:11px; letter-spacing:.4px;
+    padding:6px 10px; border-radius:3px; cursor:pointer;
+  }
+  button.dl:hover{border-color:var(--cyan); color:var(--cyan);}
+  button.dl.primary{border-color:var(--amber); color:var(--amber);}
+  button.dl.primary:hover{background:var(--amber); color:var(--bg);}
+  button.dl.solid{border-color:var(--green); color:var(--green);}
+  button.dl.solid:hover{background:var(--green); color:var(--bg);}
+  button.dl:disabled{opacity:.32; cursor:not-allowed; border-color:var(--line); color:var(--ink-faint);}
+  button.dl:disabled:hover{border-color:var(--line); color:var(--ink-faint); background:transparent;}
+
+  .legend{display:flex; gap:16px; font-size:10.5px; color:var(--ink-faint); margin:0 0 8px; flex-wrap:wrap;}
+  .legend .sw{display:inline-block; width:14px; height:3px; margin-right:5px; vertical-align:middle; border-radius:2px;}
+
+  .viewbox{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
+    padding:10px; margin-bottom:16px; overflow:auto;
+  }
+  .viewbox svg{width:100%; height:auto; display:block;}
+
+  details.fretTable{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:10px 14px;
+  }
+  details.fretTable summary{
+    cursor:pointer; color:var(--cyan); font-size:11.5px;
+    letter-spacing:.5px; text-transform:uppercase; font-weight:600; outline:none;
+  }
+  table{width:100%; border-collapse:collapse; margin-top:10px; font-size:11.5px;}
+  th,td{text-align:right; padding:4px 8px; border-bottom:1px solid var(--line-soft); color:var(--ink-dim);}
+  th{color:var(--ink-faint); font-weight:500; text-transform:uppercase; font-size:10px; letter-spacing:.5px;}
+  td:first-child, th:first-child{text-align:left; color:var(--ink);}
+  tr:hover td{color:var(--ink);}
+
+  .footnote{
+    margin-top:18px; font-size:10.5px; color:var(--ink-faint); line-height:1.6;
+    border-top:1px dashed var(--line); padding-top:12px;
+  }
+  .statusbar{
+    margin-top:10px; font-size:10.5px; line-height:1.6; color:var(--ink-faint);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:4px;
+    padding:8px 12px; min-height:32px;
+  }
+  .statusbar b{color:var(--green); font-weight:600;}
+  .statusbar.bad b{color:var(--red);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bond Stepped Fretboard <span>Profile Tool</span></h1>
+  <p>Sawtooth fret-step profile — single scale or multiscale (fanned) with a fully adjustable perpendicular fret. 2D profile for Fusion import; STEP is a true B-rep solid; STL is the mesh fallback.</p>
+</header>
+
+<div class="wrap">
+  <div class="panel form">
+
+    <div class="group">
+      <div class="group-title">Units</div>
+      <div class="toggle-row">
+        <div class="toggle-btn active" data-unit="mm">MM</div>
+        <div class="toggle-btn" data-unit="in">INCH</div>
+      </div>
+      <div class="hint">Inputs read in the selected unit. STEP and STL are always written in millimeters; the PDF is drawn 1:1 (mm). Scale lengths are clamped to 23–31&nbsp;in (584.2–787.4&nbsp;mm).</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Scale &amp; Frets</div>
+
+      <div class="l" style="font-size:11.5px;color:var(--ink-dim);margin-bottom:6px;">Scale type</div>
+      <div class="toggle-row" id="scaleTypeToggle">
+        <div class="toggle-btn active" data-scaletype="single">SINGLE</div>
+        <div class="toggle-btn" data-scaletype="multi">MULTISCALE</div>
+      </div>
+
+      <label class="field" id="singleScaleField">
+        <div class="l">Scale length <span class="u u-len">mm</span></div>
+        <input type="number" id="scaleLength" value="648" step="0.1">
+      </label>
+
+      <div id="multiScaleFields" class="hidden">
+        <div class="row2">
+          <label class="field">
+            <div class="l">Treble scale <span class="u u-len">mm</span></div>
+            <input type="number" id="trebleScale" value="648" step="0.1">
+          </label>
+          <label class="field">
+            <div class="l">Bass scale <span class="u u-len">mm</span></div>
+            <input type="number" id="bassScale" value="686" step="0.1">
+          </label>
+        </div>
+        <label class="field">
+          <div class="l">Perpendicular fret</div>
+          <select id="perpFret"></select>
+        </label>
+        <div class="hint">The perpendicular fret is held square to the centerline. Nut = frets fan out toward the bridge. A middle fret squares that fret (both ends fan). Bridge = the fan reverses, widest at the nut and converging toward the bridge. Treble = high-E edge (shorter); bass = low-string edge (longer).</div>
+      </div>
+
+      <label class="field">
+        <div class="l">Number of frets (steps)</div>
+        <input type="number" id="numFrets" value="22" step="1" min="1" max="36">
+      </label>
+      <label class="field">
+        <div class="l">Length past last fret <span class="u u-len">mm</span></div>
+        <input type="number" id="overhang" value="18" step="0.1" min="0.5">
+      </label>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Step Geometry</div>
+      <label class="field">
+        <div class="l">Base thickness (to trough) <span class="u u-len">mm</span></div>
+        <input type="number" id="baseThickness" value="8" step="0.1" min="0.5">
+      </label>
+      <label class="field">
+        <div class="l">Fret contact height <span class="u u-len">mm</span></div>
+        <input type="number" id="fretHeight" value="1.0" step="0.05" min="0.05">
+      </label>
+      <div class="hint">Each step is a right triangle: a vertical wall at the fret position (the string-contact edge) rising by the fret contact height, then a straight slope back down to the base of the next fret's wall. Base thickness is measured to the low point (trough) of the sawtooth.</div>
+      <div class="readout" id="readout"></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Board Taper <small style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0;">(STEP / STL)</small></div>
+      <div class="row2">
+        <label class="field">
+          <div class="l">Nut width <span class="u u-len">mm</span></div>
+          <input type="number" id="nutWidth" value="43" step="0.1" min="1">
+        </label>
+        <label class="field">
+          <div class="l">Heel width <span class="u u-len">mm</span></div>
+          <input type="number" id="heelWidth" value="57" step="0.1" min="1">
+        </label>
+      </div>
+      <div class="hint">Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel and single scale for a plain parallel extrusion.</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Fingerboard Radius <small style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0;">(STEP / STL)</small></div>
+      <div class="toggle-row" id="radiusToggle">
+        <div class="toggle-btn active" data-radius="flat">FLAT</div>
+        <div class="toggle-btn" data-radius="curved">RADIUSED</div>
+      </div>
+      <div id="radiusFields" class="hidden">
+        <label class="field">
+          <div class="l">Radius <span class="u u-len">mm</span></div>
+          <input type="number" id="boardRadius" value="304.8" step="0.1">
+        </label>
+        <label class="field">
+          <div class="l">Arc facets (smoothness)</div>
+          <input type="number" id="arcFacets" value="24" step="1" min="4" max="96">
+        </label>
+        <div class="hint">The radius is a cylinder whose axis runs along the neck, so the curve is across the width; the side profile is unchanged. The crown (center) keeps the full base thickness and the edges thin out by the sagitta. Minimum 7.25&nbsp;in (184.15&nbsp;mm). Higher facets = smoother arc, larger mesh. <b style="color:var(--amber)">Note:</b> in the STEP solid the radius is faceted into this many planar strips (still a real solid, just polygonal in section). Flat mode STEP is mathematically exact.</div>
+        <div class="readout" id="radiusReadout"></div>
+      </div>
+    </div>
+
+    <details class="fretTable">
+      <summary>Fret position table</summary>
+      <div id="fretTableWrap"></div>
+    </details>
+
+    <div class="footnote">
+      Flat (unradiused) Bond-style stepped board. No traditional metal frets, no compound radius. The nut region (before fret 1) is flat at trough height; there's no zero-fret step. Single scale: one 2D side profile drives everything. Multiscale: the treble and bass edges are two different profiles, so the SVG/DXF/PDF (which are inherently single-scale 2D views) are disabled — the STEP and STL loft between the two edges and are the multiscale deliverables.
+    </div>
+  </div>
+
+  <div class="panel main">
+    <div class="viewhead">
+      <h2>Side Profile <small>&nbsp;— single: extrude across width. multiscale: preview shows both edges; use the STEP.</small></h2>
+      <div class="btns">
+        <button class="dl" data-export="profile-svg" id="btnSvgSingle">Download SVG</button>
+        <button class="dl" data-export="svg-treble" id="btnSvgTreble">SVG · Treble</button>
+        <button class="dl" data-export="svg-bass" id="btnSvgBass">SVG · Bass</button>
+        <button class="dl" data-export="profile-dxf" id="btnDxfSingle">Download DXF</button>
+        <button class="dl" data-export="dxf-treble" id="btnDxfTreble">DXF · Treble</button>
+        <button class="dl" data-export="dxf-bass" id="btnDxfBass">DXF · Bass</button>
+        <button class="dl" data-export="profile-pdf" id="btnPdf">Download PDF (1:1)</button>
+        <button class="dl solid" data-export="step" id="btnStep">Download STEP (solid)</button>
+        <button class="dl primary" data-export="stl">Download STL</button>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="viewbox"><svg id="profileSVG"></svg></div>
+    <div class="hint" id="previewNote"></div>
+    <div class="statusbar" id="statusbar">STEP export ready. The STEP file is a watertight <b>MANIFOLD_SOLID_BREP</b> — open it in Fusion with File → Open (or Insert → Insert Derive) and it arrives as a real BRepBody you can fillet, boolean and machine. No mesh conversion involved.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  let unit = 'mm';
+  let scaleType = 'single';
+  let radiusMode = 'flat';
+  let lastPerpN = -1;
+  const MM_PER_IN = 25.4;
+  const MIN_SCALE_MM = 23 * MM_PER_IN;   // 584.2
+  const MAX_SCALE_MM = 31 * MM_PER_IN;   // 787.4
+  const MIN_RADIUS_MM = 7.25 * MM_PER_IN; // 184.15
+
+  function toMM(v){ return unit === 'in' ? v * MM_PER_IN : v; }
+  function clampScale(mm){
+    const c = Math.min(MAX_SCALE_MM, Math.max(MIN_SCALE_MM, mm));
+    return { value:c, clamped: Math.abs(c - mm) > 1e-6 };
+  }
+  function $(id){ return document.getElementById(id); }
+
+  // ---------- fret math ----------
+  function fretPositions(scaleLen, numFrets){
+    const arr = [];
+    for(let n=0;n<=numFrets;n++) arr.push(n===0 ? 0 : scaleLen - (scaleLen / Math.pow(2, n/12)));
+    return arr;
+  }
+
+  // Perpendicular distance from the nut, per edge, for the chosen anchor.
+  //   'nut'    -> 0
+  //   'bridge' -> the edge's full scale length
+  //   fret k   -> that fret's normal position on the edge
+  function rawPerp(scaleLen, choice, numFrets){
+    if(choice === 'nut') return 0;
+    if(choice === 'bridge') return scaleLen;
+    let k = parseInt(choice);
+    if(isNaN(k)) return 0;
+    k = Math.min(numFrets, Math.max(0, k));
+    return k === 0 ? 0 : scaleLen - (scaleLen / Math.pow(2, k/12));
+  }
+
+  // sawtooth: constant trough (baseThickness) / constant peak (baseThickness+fretHeight)
+  function buildSawtoothProfile(scaleLen, numFrets, baseThickness, fretHeight, overhang){
+    const x = fretPositions(scaleLen, numFrets);
+    const trough = baseThickness, peak = baseThickness + fretHeight;
+    const pts = [{x:0, z:trough, fret:0, kind:'nut'}];
+    for(let k=1;k<=numFrets;k++){
+      pts.push({x:x[k], z:trough, fret:k, kind:'base'});
+      pts.push({x:x[k], z:peak,   fret:k, kind:'peak'});
+    }
+    pts.push({x:x[numFrets]+overhang, z:trough, fret:numFrets+1, kind:'heel'});
+    return {profile: pts, fretX: x};
+  }
+
+  function closedPolygon(profilePts){
+    const first = profilePts[0], last = profilePts[profilePts.length-1];
+    return [{x:first.x,z:0}].concat(profilePts).concat([{x:last.x,z:0}]);
+  }
+
+  // Build one edge, shifted along x by `shift` so the perpendicular fret aligns.
+  function edgeModel(scaleLen, p, shift){
+    const {profile, fretX} = buildSawtoothProfile(scaleLen, p.numFrets, p.baseThickness, p.fretHeight, p.overhang);
+    const sProfile = profile.map(pt=>({x:pt.x+shift, z:pt.z, fret:pt.fret, kind:pt.kind}));
+    const polygon = closedPolygon(sProfile);
+    const totalLength = fretX[p.numFrets] + p.overhang;
+    return {profile:sProfile, polygon, fretX:fretX.map(x=>x+shift), fretXRaw:fretX, totalLength, scaleLen, shift};
+  }
+
+  // ---------- geometry helpers ----------
+  function cross2(o,a,b){ return (a.x-o.x)*(b.z-o.z) - (a.z-o.z)*(b.x-o.x); }
+  function pointInTri(p,a,b,c){
+    const d1=cross2(a,b,p), d2=cross2(b,c,p), d3=cross2(c,a,p);
+    const hasNeg=(d1<0)||(d2<0)||(d3<0), hasPos=(d1>0)||(d2>0)||(d3>0);
+    return !(hasNeg && hasPos);
+  }
+  function polygonArea2(poly){
+    let a=0; for(let i=0;i<poly.length;i++){ const p=poly[i], q=poly[(i+1)%poly.length]; a += p.x*q.z - q.x*p.z; } return a;
+  }
+  // Ear-clip on a polygon assumed CCW (positive area). Returns index triples.
+  function earClipTris(poly){
+    const idx = poly.map((_,i)=>i);
+    const tris = [];
+    let guard = 0;
+    while(idx.length > 3 && guard < 100000){
+      guard++;
+      let earFound = false;
+      for(let i=0;i<idx.length;i++){
+        const iPrev = idx[(i-1+idx.length)%idx.length], iCur = idx[i], iNext = idx[(i+1)%idx.length];
+        const a=poly[iPrev], b=poly[iCur], c=poly[iNext];
+        if(cross2(a,b,c) <= 1e-9) continue;
+        let contains = false;
+        for(let j=0;j<idx.length;j++){
+          const pj = idx[j];
+          if(pj===iPrev||pj===iCur||pj===iNext) continue;
+          if(pointInTri(poly[pj], a,b,c)){ contains = true; break; }
+        }
+        if(contains) continue;
+        tris.push([iPrev,iCur,iNext]);
+        idx.splice(i,1);
+        earFound = true;
+        break;
+      }
+      if(!earFound) break;
+    }
+    if(idx.length===3) tris.push([idx[0],idx[1],idx[2]]);
+    return tris;
+  }
+
+  // 3D Newell normal of a planar-ish polygon (unit length).
+  function newell(pts){
+    let nx=0, ny=0, nz=0;
+    for(let i=0;i<pts.length;i++){
+      const a = pts[i], b = pts[(i+1)%pts.length];
+      nx += (a.y-b.y)*(a.z+b.z);
+      ny += (a.z-b.z)*(a.x+b.x);
+      nz += (a.x-b.x)*(a.y+b.y);
+    }
+    const L = Math.hypot(nx,ny,nz) || 1;
+    return {x:nx/L, y:ny/L, z:nz/L};
+  }
+
+  // ---------- perpendicular-fret dropdown ----------
+  function perpLabel(choice){
+    if(choice==='nut') return 'Nut (fret 0)';
+    if(choice==='bridge') return 'Bridge';
+    return 'Fret ' + choice;
+  }
+  function populatePerpOptions(N){
+    const sel = $('perpFret');
+    const prev = sel.value;
+    let html = '<option value="nut">Nut (fret 0)</option>';
+    for(let k=1;k<=N;k++) html += `<option value="${k}">Fret ${k}</option>`;
+    html += '<option value="bridge">Bridge (fan reverses)</option>';
+    sel.innerHTML = html;
+    const kprev = parseInt(prev);
+    const valid = (prev==='nut'||prev==='bridge'|| (kprev>=1 && kprev<=N));
+    sel.value = valid ? prev : 'nut';
+  }
+
+  function getParams(){
+    const numFrets = Math.max(1, Math.round(parseFloat($('numFrets').value)||22));
+    const multiscale = (scaleType === 'multi');
+
+    let bassRaw, trebleRaw;
+    if(multiscale){
+      trebleRaw = toMM(parseFloat($('trebleScale').value)||648);
+      bassRaw   = toMM(parseFloat($('bassScale').value)||686);
+    } else {
+      const s = toMM(parseFloat($('scaleLength').value)||648);
+      trebleRaw = s; bassRaw = s;
+    }
+    const tC = clampScale(trebleRaw), bC = clampScale(bassRaw);
+
+    return {
+      multiscale,
+      numFrets,
+      perpChoice: multiscale ? ($('perpFret').value || 'nut') : 'nut',
+      trebleScale: tC.value,
+      bassScale: bC.value,
+      trebleClamped: tC.clamped,
+      bassClamped: bC.clamped,
+      overhang: Math.max(0.1, toMM(parseFloat($('overhang').value)||18)),
+      baseThickness: Math.max(0.1, toMM(parseFloat($('baseThickness').value)||8)),
+      fretHeight: Math.max(0.01, toMM(parseFloat($('fretHeight').value)||1.0)),
+      nutWidth: Math.max(0.1, toMM(parseFloat($('nutWidth').value)||43)),
+      heelWidth: Math.max(0.1, toMM(parseFloat($('heelWidth').value)||57)),
+      radiused: (radiusMode === 'curved'),
+      // Radius clamped to a safe minimum; sagitta feasibility checked at build.
+      boardRadius: Math.max(MIN_RADIUS_MM, toMM(parseFloat($('boardRadius').value)||304.8)),
+      arcFacets: Math.max(4, Math.min(96, Math.round(parseFloat($('arcFacets').value)||24))),
+    };
+  }
+
+  // ---------- SVG ----------
+  const NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs){
+    const el = document.createElementNS(NS, tag);
+    for(const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function ptsStr(pts){ return pts.map(p=>p[0].toFixed(3)+','+p[1].toFixed(3)).join(' '); }
+
+  // Standalone SVG string for one edge polygon, in shared mm coordinates
+  // (y-up flipped for screen, but geometry is 1 unit = 1 mm). Includes a datum
+  // cross at the origin and a tick at the perpendicular fret so both files drop
+  // onto the Fusion origin pre-aligned in length.
+  function edgeSVGString(edge, model, label, stroke){
+    const poly = edge.polygon;
+    const maxX = Math.max(...poly.map(p=>p.x));
+    const maxZ = Math.max(...poly.map(p=>p.z));
+    const pad = Math.max(6, maxZ*0.4);
+    const W = maxX + pad*2, H = maxZ + pad*2;
+    const perpX = model.perpX || 0;
+    // Flip y so z is up: screenY = (maxZ - z) + pad ; x offset by pad.
+    const P = poly.map(p=>[(p.x+pad), (maxZ - p.z + pad)]);
+    let s = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    s += `<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(3)}mm" height="${H.toFixed(3)}mm" viewBox="0 0 ${W.toFixed(3)} ${H.toFixed(3)}">\n`;
+    s += `<polygon points="${ptsStr(P)}" fill="none" stroke="${stroke}" stroke-width="0.4"/>\n`;
+    // datum cross at origin (x=0, baseline z=0)
+    const ox = pad, oy = (maxZ + pad);
+    s += `<line x1="${(ox-4).toFixed(2)}" y1="${oy.toFixed(2)}" x2="${(ox+4).toFixed(2)}" y2="${oy.toFixed(2)}" stroke="#999" stroke-width="0.3"/>\n`;
+    s += `<line x1="${ox.toFixed(2)}" y1="${(oy-4).toFixed(2)}" x2="${ox.toFixed(2)}" y2="${(oy+4).toFixed(2)}" stroke="#999" stroke-width="0.3"/>\n`;
+    // perpendicular-fret tick (vertical dashed line)
+    s += `<line x1="${(perpX+pad).toFixed(2)}" y1="${pad.toFixed(2)}" x2="${(perpX+pad).toFixed(2)}" y2="${(maxZ+pad).toFixed(2)}" stroke="#c060c0" stroke-width="0.3" stroke-dasharray="1.5,1.5"/>\n`;
+    s += `<text x="${(pad).toFixed(2)}" y="${(H-2).toFixed(2)}" font-size="4" fill="#666">${label} — origin datum + perpendicular-fret tick (x=${perpX.toFixed(2)} mm), 1 unit = 1 mm</text>\n`;
+    s += `</svg>\n`;
+    return s;
+  }
+
+  function renderProfile(model){
+    const svg = $('profileSVG');
+    svg.innerHTML = '';
+    const edges = model.multiscale ? [model.bass, model.treble] : [model.treble];
+
+    const allPts = [].concat(...edges.map(e=>e.polygon));
+    const minX = Math.min(...allPts.map(p=>p.x));
+    const maxX = Math.max(...allPts.map(p=>p.x));
+    const maxZ = Math.max(...allPts.map(p=>p.z));
+    const pad = Math.max(4, maxZ*0.3);
+    const vbX = minX-pad, vbY = -pad, vbW = (maxX-minX)+pad*2, vbH = maxZ+pad*2;
+    svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+    svg.style.aspectRatio = (vbW/vbH);
+
+    const g = svgEl('g', {transform:`translate(0,${maxZ}) scale(1,-1)`});
+    svg.appendChild(g);
+
+    const styles = model.multiscale
+      ? { bass:{stroke:'#ffb454', fill:'rgba(255,180,84,0.06)'}, treble:{stroke:'#5fe3e0', fill:'rgba(95,227,224,0.08)'} }
+      : { treble:{stroke:'#5fe3e0', fill:'rgba(95,227,224,0.08)'} };
+
+    edges.forEach(edge=>{
+      const which = (edge===model.treble) ? 'treble' : 'bass';
+      const st = styles[which];
+      g.appendChild(svgEl('polygon',{
+        points: ptsStr(edge.polygon.map(p=>[p.x,p.z])),
+        fill:st.fill, stroke:st.stroke, 'stroke-width':0.5,
+        'vector-effect':'non-scaling-stroke', 'stroke-linejoin':'round'
+      }));
+    });
+
+    // fret number labels along the treble edge peaks
+    const labelG = svgEl('g', {transform:`translate(0,${maxZ}) scale(1,-1)`});
+    svg.appendChild(labelG);
+    model.treble.profile.forEach(p=>{
+      if(p.kind==='peak'){
+        const t = svgEl('text',{
+          x:p.x, y:maxZ-(p.z)+ (-2.2), 'font-size':Math.max(2, maxZ*0.09),
+          fill:'#7d93a3', 'text-anchor':'middle'
+        });
+        t.textContent = p.fret;
+        labelG.appendChild(t);
+      }
+    });
+
+    g.appendChild(svgEl('line',{
+      x1:minX,y1:0,x2:maxX,y2:0, stroke:'#223140','stroke-width':0.25,'vector-effect':'non-scaling-stroke'
+    }));
+
+    // legend
+    const legend = $('legend');
+    if(model.multiscale){
+      legend.innerHTML =
+        '<span><span class="sw" style="background:#5fe3e0"></span>Treble edge ('+model.treble.scaleLen.toFixed(1)+' mm)</span>' +
+        '<span><span class="sw" style="background:#ffb454"></span>Bass edge ('+model.bass.scaleLen.toFixed(1)+' mm)</span>' +
+        '<span>Perpendicular: '+perpLabel(model.params.perpChoice)+'</span>';
+    } else {
+      legend.innerHTML = '<span><span class="sw" style="background:#5fe3e0"></span>Side profile ('+model.treble.scaleLen.toFixed(1)+' mm)</span>';
+    }
+  }
+
+  function renderReadout(model){
+    const p = model.params;
+    const el = $('readout');
+    el.innerHTML = '';
+    const peak = p.baseThickness + p.fretHeight;
+    const rows = [];
+    if(p.multiscale){
+      rows.push(['Treble scale', p.trebleScale.toFixed(2)+' mm', p.trebleClamped]);
+      rows.push(['Bass scale', p.bassScale.toFixed(2)+' mm', p.bassClamped]);
+      rows.push(['Fan (bass − treble)', (p.bassScale-p.trebleScale).toFixed(2)+' mm', false]);
+      rows.push(['Perpendicular at', perpLabel(p.perpChoice), false]);
+      rows.push(['Treble profile length', model.treble.totalLength.toFixed(2)+' mm', false]);
+      rows.push(['Bass profile length', model.bass.totalLength.toFixed(2)+' mm', false]);
+      rows.push(['— LOFT SETUP —', '', false]);
+      rows.push(['Sketch separation (= heel width)', p.heelWidth.toFixed(2)+' mm', false]);
+      rows.push(['Perp-fret x (align both sketches)', (model.perpX||0).toFixed(2)+' mm', false]);
+      rows.push(['Board width at perp fret', (model.widthAtPerp||0).toFixed(2)+' mm', false]);
+    } else {
+      rows.push(['Scale length', p.trebleScale.toFixed(2)+' mm', p.trebleClamped]);
+      rows.push(['Total profile length', model.treble.totalLength.toFixed(2)+' mm', false]);
+    }
+    rows.push(['Trough (low) height', p.baseThickness.toFixed(2)+' mm', false]);
+    rows.push(['Peak (fret contact) height', peak.toFixed(2)+' mm', false]);
+    rows.push(['Nut width (solid)', p.nutWidth.toFixed(2)+' mm', false]);
+    rows.push(['Heel width (solid)', p.heelWidth.toFixed(2)+' mm', false]);
+
+    rows.forEach(r=>{
+      const d = document.createElement('div');
+      d.className = 'r' + (r[2] ? ' warn' : '');
+      const note = r[2] ? ' (clamped 23–31 in)' : '';
+      d.innerHTML = `<span>${r[0]}${note}</span><b>${r[1]}</b>`;
+      el.appendChild(d);
+    });
+  }
+
+  function renderFretTable(model){
+    const p = model.params;
+    const tx = model.treble.fretX, bx = model.bass.fretX;
+    let html;
+    if(p.multiscale){
+      html = '<table><thead><tr><th>Fret</th><th>Treble x (mm)</th><th>Bass x (mm)</th><th>Fan Δx (mm)</th></tr></thead><tbody>';
+      for(let k=0;k<=p.numFrets;k++){
+        html += `<tr><td>${k===0?'Nut':k}</td><td>${tx[k].toFixed(2)}</td><td>${bx[k].toFixed(2)}</td><td>${(bx[k]-tx[k]).toFixed(2)}</td></tr>`;
+      }
+    } else {
+      html = '<table><thead><tr><th>Fret</th><th>Distance from nut (mm)</th><th>Fret-to-fret (mm)</th></tr></thead><tbody>';
+      for(let k=0;k<=p.numFrets;k++){
+        const gap = k===0 ? '—' : (tx[k]-tx[k-1]).toFixed(2);
+        html += `<tr><td>${k===0?'Nut':k}</td><td>${tx[k].toFixed(2)}</td><td>${gap}</td></tr>`;
+      }
+    }
+    html += '</tbody></table>';
+    $('fretTableWrap').innerHTML = html;
+  }
+
+  // ---------- DXF ----------
+  function dxfHeader(){ return "0\nSECTION\n2\nENTITIES\n"; }
+  function dxfFooter(){ return "0\nENDSEC\n0\nEOF\n"; }
+  function dxfPolyline(pts, layer, closed){
+    let s = `0\nLWPOLYLINE\n8\n${layer}\n90\n${pts.length}\n70\n${closed?1:0}\n`;
+    pts.forEach(p=>{ s += `10\n${p[0].toFixed(4)}\n20\n${p[1].toFixed(4)}\n`; });
+    return s;
+  }
+  function dxfLine(x1,y1,x2,y2,layer){
+    return `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n`;
+  }
+  // One edge as its own DXF (shared mm coordinates: x = length, y = height/z).
+  // Includes an origin datum cross and a perpendicular-fret tick so both files
+  // drop onto the Fusion origin pre-aligned in length.
+  function edgeDXFString(edge, model, layer){
+    let s = dxfHeader();
+    s += dxfPolyline(edge.polygon.map(p=>[p.x,p.z]), layer, true);
+    // origin datum cross
+    s += dxfLine(-4,0,4,0,'DATUM');
+    s += dxfLine(0,-4,0,4,'DATUM');
+    // perpendicular-fret tick
+    const perpX = model.perpX || 0;
+    const maxZ = Math.max(...edge.polygon.map(p=>p.z));
+    s += dxfLine(perpX,0,perpX,maxZ,'PERP_FRET');
+    s += dxfFooter();
+    return s;
+  }
+  function profileDXF(model){
+    let s = dxfHeader();
+    s += dxfPolyline(model.treble.polygon.map(p=>[p.x,p.z]), 'PROFILE', true);
+    s += dxfFooter();
+    return s;
+  }
+
+  // ---------- PDF (hand-written, true 1:1: 1 mm = 72/25.4 pt; single scale only) ----------
+  const MM2PT = 72/25.4;
+  function profilePDF(model){
+    const poly = model.treble.polygon;
+    const maxX = Math.max(...poly.map(p=>p.x));
+    const maxZ = Math.max(...poly.map(p=>p.z));
+    const marginMM = 10;
+    const pageW = (maxX + marginMM*2) * MM2PT;
+    const pageH = (maxZ + marginMM*2) * MM2PT;
+    const ox = marginMM * MM2PT, oy = marginMM * MM2PT;
+
+    let content = '0.6 w\n0 0 0 RG\n';
+    poly.forEach((p,i)=>{
+      const X = (ox + p.x*MM2PT).toFixed(3);
+      const Y = (oy + p.z*MM2PT).toFixed(3);
+      content += `${X} ${Y} ${i===0?'m':'l'}\n`;
+    });
+    content += 'h\nS\n';
+    content += 'BT /F1 8 Tf 0 0 0 rg ';
+    content += `${ox.toFixed(2)} ${(pageH-14).toFixed(2)} Td (Bond fretboard side profile - printed at 1:1 scale, millimeters) Tj ET\n`;
+
+    return buildPDF(pageW, pageH, content);
+  }
+  function buildPDF(pageW, pageH, content){
+    const objs = [];
+    objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+    objs.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW.toFixed(2)} ${pageH.toFixed(2)}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`);
+    objs.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [];
+    for(let i=0;i<objs.length;i++){
+      offsets.push(pdf.length);
+      pdf += `${i+1} 0 obj\n${objs[i]}\nendobj\n`;
+    }
+    const xrefStart = pdf.length;
+    pdf += `xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;
+    offsets.forEach(off=>{ pdf += String(off).padStart(10,'0') + ' 00000 n \n'; });
+    pdf += `trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+    return pdf;
+  }
+
+  // ================================================================
+  //  SHARED SOLID GENERATION — stations across the width
+  // ================================================================
+  // Each station is the sawtooth profile at a lateral position y.
+  //  - x per station interpolates treble<->bass (multiscale fan; identical for
+  //    single scale).
+  //  - z of every TOP vertex is lowered by the cylinder sagitta at that station
+  //    (radiused); baseline corners (z=0) stay flat -> flat bottom preserved.
+  // Flat mode uses 1 span (2 stations) = the original tapered loft. Radiused
+  // mode uses arcFacets spans. All stations share vertex structure, so skinning
+  // is a simple index march and the result is watertight (ends are capped).
+  //
+  // KEY PROPERTY (exploited by the STEP writer): halfW(x) is linear in x, and
+  // y = -halfW(x) + 2*halfW(x)*f  =>  y is a linear function of x for a fixed
+  // station. So every station lies in a VERTICAL PLANE. That makes each end cap
+  // a single planar face, and (for single scale) every side strip planar too.
+  function buildStations(model){
+    const p = model.params;
+    let tp = model.treble.polygon.slice();  // treble edge profile
+    let bp = model.bass.polygon.slice();    // bass edge profile
+    if(polygonArea2(tp) < 0){ tp.reverse(); bp.reverse(); }
+    const n = tp.length;
+
+    const maxX = Math.max(...tp.map(v=>v.x), ...bp.map(v=>v.x));
+    function halfW(x){
+      const t = maxX>0 ? Math.min(1, Math.max(0, x/maxX)) : 0;
+      return (p.nutWidth + (p.heelWidth - p.nutWidth)*t) / 2;
+    }
+
+    const R = p.boardRadius;
+    // Safety clamp: never let the arc breach the flat bottom. Keep at least
+    // 0.4 mm of material at the thinnest (deepest-cut) point.
+    const maxDrop = Math.max(0, p.baseThickness - 0.4);
+    // Sagitta of the cylinder at lateral offset d from the crown (center).
+    function sag(d){
+      const arg = R*R - d*d;
+      const s = arg <= 0 ? R : (R - Math.sqrt(arg));
+      return Math.min(s, maxDrop);
+    }
+
+    const spans = p.radiused ? p.arcFacets : 1;
+
+    // Bass edge sits on the -y (front) face, treble on +y (back): matches the
+    // convention fixed earlier (treble = high-E). Station s in [0..spans] runs
+    // bass(0) -> treble(1). We interpolate x per vertex and drop z by sagitta.
+    function station(s){
+      const f = s / spans;                       // 0 at bass edge, 1 at treble edge
+      const verts = [];
+      for(let i=0;i<n;i++){
+        const bx = bp[i].x, tx = tp[i].x;
+        const bz = bp[i].z;                      // z identical between edges
+        const x = bx + (tx - bx)*f;
+        const zTop = bz;
+        const hw = halfW(x);
+        const y = -hw + (2*hw)*f;
+        let z = zTop;
+        if(p.radiused && zTop > 1e-9){
+          z = zTop - sag(Math.abs(y));
+        }
+        verts.push({x, y, z});
+      }
+      return verts;
+    }
+
+    const stations = [];
+    for(let s=0;s<=spans;s++) stations.push(station(s));
+    return {stations, n, spans, tp, bp};
+  }
+
+  // ---------- STL: triangulated skin of the stations ----------
+  function loftToSTL(model){
+    const {stations, n, spans, tp} = buildStations(model);
+    const tris2d = earClipTris(tp);   // shared triangulation (same structure both edges)
+    const tris = [];
+    // Front cap (bass edge, s=0): faces -y, reversed winding.
+    tris2d.forEach(([i,j,k])=>{ tris.push([stations[0][i], stations[0][k], stations[0][j]]); });
+    // Back cap (treble edge, s=spans): faces +y.
+    const last = stations[spans];
+    tris2d.forEach(([i,j,k])=>{ tris.push([last[i], last[j], last[k]]); });
+    // Skin between consecutive stations.
+    for(let s=0;s<spans;s++){
+      const A = stations[s], B = stations[s+1];
+      for(let i=0;i<n;i++){
+        const j=(i+1)%n;
+        tris.push([A[i], A[j], B[j]]);
+        tris.push([A[i], B[j], B[i]]);
+      }
+    }
+    return tris;
+  }
+  function normalOf(a,b,c){
+    const ux=b.x-a.x, uy=b.y-a.y, uz=b.z-a.z, vx=c.x-a.x, vy=c.y-a.y, vz=c.z-a.z;
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const len=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+    return [nx/len, ny/len, nz/len];
+  }
+  function stlString(tris, name){
+    let s = `solid ${name}\n`;
+    tris.forEach(([a,b,c])=>{
+      const n = normalOf(a,b,c);
+      s += `facet normal ${n[0].toFixed(6)} ${n[1].toFixed(6)} ${n[2].toFixed(6)}\n outer loop\n`;
+      [a,b,c].forEach(v=>{ s += `  vertex ${v.x.toFixed(5)} ${v.y.toFixed(5)} ${v.z.toFixed(5)}\n`; });
+      s += ` endloop\nendfacet\n`;
+    });
+    s += `endsolid ${name}\n`;
+    return s;
+  }
+
+  // ================================================================
+  //  STEP EXPORT — indexed B-rep -> ISO 10303-21 AP214 MANIFOLD_SOLID_BREP
+  // ================================================================
+  // Produces {verts, faces} where faces is an array of index loops wound CCW
+  // when viewed from OUTSIDE. Quads that are non-planar get split into two
+  // triangles; everything else stays as a single face so Fusion sees clean,
+  // minimal topology (a flat single-scale 22-fret board is ~48 faces).
+  function brepFromStations(st){
+    const {stations, n, spans} = st;
+    const verts = [];
+    const weld  = new Map();
+    const V = v => {
+      const k = v.x.toFixed(6)+'|'+v.y.toFixed(6)+'|'+v.z.toFixed(6);
+      let i = weld.get(k);
+      if(i === undefined){ i = verts.length; verts.push({x:v.x, y:v.y, z:v.z}); weld.set(k,i); }
+      return i;
+    };
+    const idx = stations.map(s => s.map(V));
+    const faces = [];
+
+    // Caps: the two edge profiles, each a single planar (concave) face.
+    faces.push(idx[0].slice().reverse());
+    faces.push(idx[spans].slice());
+
+    // Skin.
+    for(let s=0; s<spans; s++){
+      const A = idx[s], B = idx[s+1];
+      for(let i=0;i<n;i++){
+        const j = (i+1)%n;
+        pushQuad(faces, verts, A[i], A[j], B[j], B[i]);
+      }
+    }
+    const vol = fixOutward(verts, faces);
+    return {verts, faces, volume:Math.abs(vol)};
+  }
+
+  function pushQuad(faces, verts, a, b, c, d){
+    // Collapse degenerate quads (can happen if two stations coincide).
+    const uniq = [a,b,c,d].filter((v,i,arr)=>arr.indexOf(v)===i);
+    if(uniq.length < 3) return;
+    if(uniq.length === 3){ faces.push(uniq); return; }
+
+    const P = [verts[a], verts[b], verts[c], verts[d]];
+    const nrm = newell(P);
+    const cen = P.reduce((s,p)=>({x:s.x+p.x/4, y:s.y+p.y/4, z:s.z+p.z/4}), {x:0,y:0,z:0});
+    let dev = 0, size = 0;
+    P.forEach(p=>{
+      dev  = Math.max(dev, Math.abs((p.x-cen.x)*nrm.x + (p.y-cen.y)*nrm.y + (p.z-cen.z)*nrm.z));
+      size = Math.max(size, Math.hypot(p.x-cen.x, p.y-cen.y, p.z-cen.z));
+    });
+
+    // Planar within tolerance -> keep as a single quad face.
+    if(dev <= Math.max(1e-7, size*1e-7)){ faces.push([a,b,c,d]); return; }
+
+    // Warped -> split on the shorter diagonal for better-conditioned triangles.
+    const dAC = Math.hypot(P[0].x-P[2].x, P[0].y-P[2].y, P[0].z-P[2].z);
+    const dBD = Math.hypot(P[1].x-P[3].x, P[1].y-P[3].y, P[1].z-P[3].z);
+    if(dAC <= dBD){ faces.push([a,b,c]); faces.push([a,c,d]); }
+    else          { faces.push([b,c,d]); faces.push([b,d,a]); }
+  }
+
+  // Divergence-theorem volume. If negative, every face is inward-facing, so
+  // flip them all. Beats reasoning about winding conventions by hand.
+  function fixOutward(verts, faces){
+    let vol = 0;
+    faces.forEach(f=>{
+      const a = verts[f[0]];
+      for(let i=1;i<f.length-1;i++){
+        const b = verts[f[i]], c = verts[f[i+1]];
+        vol += (a.x*(b.y*c.z - b.z*c.y) - a.y*(b.x*c.z - b.z*c.x) + a.z*(b.x*c.y - b.y*c.x));
+      }
+    });
+    if(vol < 0) faces.forEach(f=>f.reverse());
+    return vol/6;
+  }
+
+  // Manifold check: every edge must be used exactly twice (once per direction).
+  function validateBrep(faces){
+    const use = new Map();
+    faces.forEach(f=>{
+      for(let i=0;i<f.length;i++){
+        const a=f[i], b=f[(i+1)%f.length];
+        const k = Math.min(a,b)+'_'+Math.max(a,b);
+        use.set(k, (use.get(k)||0) + 1);
+      }
+    });
+    let bad = 0;
+    use.forEach(c=>{ if(c!==2) bad++; });
+    return {edges:use.size, nonManifold:bad};
+  }
+
+  // ---------- the STEP writer ----------
+  function stepString(verts, faces, name){
+    let id = 0;
+    const L = [];
+    const A = body => { id++; L.push('#'+id+'='+body+';'); return '#'+id; };
+
+    // STEP reals must always carry a '.' and use uppercase 'E'.
+    const num = v => {
+      if(!isFinite(v)) v = 0;
+      if(Math.abs(v) < 1e-12) return '0.';
+      let s = v.toPrecision(12);
+      if(/e/i.test(s)){
+        let parts = s.split(/e/i);
+        let m = parts[0];
+        if(m.indexOf('.') < 0) m += '.';
+        m = m.replace(/(\.\d*?)0+$/, '$1');
+        return m + 'E' + parts[1];
+      }
+      if(s.indexOf('.') < 0) s += '.';
+      return s.replace(/(\.\d*?)0+$/, '$1');
+    };
+    const P3 = v => '(' + num(v.x) + ',' + num(v.y) + ',' + num(v.z) + ')';
+
+    // --- units / representation context (millimetres, 1e-7 tolerance)
+    const lenU = A('( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) )');
+    const angU = A('( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) )');
+    const solU = A('( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() )');
+    const unc  = A(`UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-7),${lenU},'distance_accuracy_value','confusion accuracy')`);
+    const ctx  = A(`( GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((${unc})) GLOBAL_UNIT_ASSIGNED_CONTEXT((${lenU},${angU},${solU})) REPRESENTATION_CONTEXT('','3D') )`);
+
+    // --- world axis placement
+    const oPt = A("CARTESIAN_POINT('',(0.,0.,0.))");
+    const zD  = A("DIRECTION('',(0.,0.,1.))");
+    const xD  = A("DIRECTION('',(1.,0.,0.))");
+    const ax0 = A(`AXIS2_PLACEMENT_3D('',${oPt},${zD},${xD})`);
+
+    // --- vertices
+    const vp = verts.map(v=>{
+      const cp = A(`CARTESIAN_POINT('',${P3(v)})`);
+      return { cp:cp, vp: A(`VERTEX_POINT('',${cp})`) };
+    });
+
+    // --- shared edges, keyed low->high so both adjacent faces reuse one EDGE_CURVE
+    const edges = new Map();
+    const edgeOf = (i,j) => {
+      const lo = Math.min(i,j), hi = Math.max(i,j);
+      const key = lo+'_'+hi;
+      let e = edges.get(key);
+      if(!e){
+        const a = verts[lo], b = verts[hi];
+        const d = {x:b.x-a.x, y:b.y-a.y, z:b.z-a.z};
+        const len = Math.hypot(d.x,d.y,d.z) || 1;
+        const lp  = A(`CARTESIAN_POINT('',${P3(a)})`);
+        const dir = A(`DIRECTION('',${P3({x:d.x/len, y:d.y/len, z:d.z/len})})`);
+        const vec = A(`VECTOR('',${dir},${num(len)})`);
+        const lin = A(`LINE('',${lp},${vec})`);
+        e = { lo:lo, ec: A(`EDGE_CURVE('',${vp[lo].vp},${vp[hi].vp},${lin},.T.)`) };
+        edges.set(key, e);
+      }
+      return e;
+    };
+
+    // --- faces
+    const faceIds = faces.map(f=>{
+      const pts = f.map(i=>verts[i]);
+      const nrm = newell(pts);
+      // Any unit vector perpendicular to nrm works as the plane's ref direction.
+      const t = (Math.abs(nrm.z) < 0.9) ? {x:0,y:0,z:1} : {x:1,y:0,z:0};
+      let r = { x:t.y*nrm.z - t.z*nrm.y, y:t.z*nrm.x - t.x*nrm.z, z:t.x*nrm.y - t.y*nrm.x };
+      const rl = Math.hypot(r.x,r.y,r.z) || 1;
+      r = {x:r.x/rl, y:r.y/rl, z:r.z/rl};
+
+      const loc = A(`CARTESIAN_POINT('',${P3(pts[0])})`);
+      const nd  = A(`DIRECTION('',${P3(nrm)})`);
+      const rd  = A(`DIRECTION('',${P3(r)})`);
+      const plc = A(`AXIS2_PLACEMENT_3D('',${loc},${nd},${rd})`);
+      const pln = A(`PLANE('',${plc})`);
+
+      const oe = f.map((vi,k)=>{
+        const vj = f[(k+1)%f.length];
+        const e  = edgeOf(vi,vj);
+        return A(`ORIENTED_EDGE('',*,*,${e.ec},${e.lo===vi ? '.T.' : '.F.'})`);
+      });
+      const loop  = A(`EDGE_LOOP('',(${oe.join(',')}))`);
+      const bound = A(`FACE_OUTER_BOUND('',${loop},.T.)`);
+      return A(`ADVANCED_FACE('',(${bound}),${pln},.T.)`);
+    });
+
+    const shell = A(`CLOSED_SHELL('',(${faceIds.join(',')}))`);
+    const brep  = A(`MANIFOLD_SOLID_BREP('${name}',${shell})`);
+    const absr  = A(`ADVANCED_BREP_SHAPE_REPRESENTATION('',(${ax0},${brep}),${ctx})`);
+
+    // --- product structure (the minimum Fusion will accept)
+    const appCtx = A("APPLICATION_CONTEXT('automotive design')");
+                   A(`APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,${appCtx})`);
+    const pCtx   = A(`PRODUCT_CONTEXT('',${appCtx},'mechanical')`);
+    const pdCtx  = A(`PRODUCT_DEFINITION_CONTEXT('part definition',${appCtx},'design')`);
+    const prod   = A(`PRODUCT('${name}','${name}','',(${pCtx}))`);
+                   A(`PRODUCT_RELATED_PRODUCT_CATEGORY('part','',(${prod}))`);
+    const pdf    = A(`PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',${prod},.NOT_KNOWN.)`);
+    const pd     = A(`PRODUCT_DEFINITION('design','',${pdf},${pdCtx})`);
+    const pds    = A(`PRODUCT_DEFINITION_SHAPE('','',${pd})`);
+                   A(`SHAPE_DEFINITION_REPRESENTATION(${pds},${absr})`);
+
+    const stamp = new Date().toISOString().replace(/\.\d+Z$/,'');
+    return [
+      'ISO-10303-21;',
+      'HEADER;',
+      "FILE_DESCRIPTION(('Bond stepped fretboard'),'2;1');",
+      `FILE_NAME('${name}.step','${stamp}',('Bond Profile Tool'),(''),'','Bond Profile Tool','');`,
+      "FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));",
+      'ENDSEC;',
+      'DATA;',
+      L.join('\n'),
+      'ENDSEC;',
+      'END-ISO-10303-21;',
+      ''
+    ].join('\n');
+  }
+
+  // ---------- build + render ----------
+  let currentModel = null;
+
+  function setStatus(html, bad){
+    const el = $('statusbar');
+    el.className = 'statusbar' + (bad ? ' bad' : '');
+    el.innerHTML = html;
+  }
+
+  function rebuild(){
+    const p = getParams();
+
+    if(p.numFrets !== lastPerpN){
+      populatePerpOptions(p.numFrets);
+      lastPerpN = p.numFrets;
+      p.perpChoice = p.multiscale ? ($('perpFret').value || 'nut') : 'nut';
+    }
+
+    const perpT = rawPerp(p.trebleScale, p.perpChoice, p.numFrets);
+    const perpB = rawPerp(p.bassScale, p.perpChoice, p.numFrets);
+    const G = Math.max(perpT, perpB);   // guarantees min x = 0 (valid geometry)
+
+    const treble = edgeModel(p.trebleScale, p, G - perpT);
+    const bass   = p.multiscale ? edgeModel(p.bassScale, p, G - perpB) : treble;
+
+    // Perpendicular-fret x-position (identical on both edges by construction),
+    // and the trapezoid board width there (Option A: exact scales at heel end).
+    const maxXall = Math.max(
+      ...treble.polygon.map(v=>v.x), ...bass.polygon.map(v=>v.x)
+    );
+    const widthAtPerp = p.nutWidth + (p.heelWidth - p.nutWidth) * (maxXall>0 ? G/maxXall : 0);
+    currentModel = { treble, bass, multiscale:p.multiscale, params:p,
+                     perpX:G, maxXall, widthAtPerp };
+
+    // Button visibility: single scale shows one SVG/DXF/PDF; multiscale shows
+    // dedicated Treble/Bass SVG + DXF buttons (each a single-click download,
+    // so browsers never block them), and hides PDF (single-scale 1:1 only).
+    // STEP and STL are always available.
+    const ms = p.multiscale;
+    $('btnSvgSingle').classList.toggle('hidden', ms);
+    $('btnDxfSingle').classList.toggle('hidden', ms);
+    $('btnPdf').classList.toggle('hidden', ms);
+    $('btnSvgTreble').classList.toggle('hidden', !ms);
+    $('btnSvgBass').classList.toggle('hidden', !ms);
+    $('btnDxfTreble').classList.toggle('hidden', !ms);
+    $('btnDxfBass').classList.toggle('hidden', !ms);
+
+    $('previewNote').innerHTML = p.multiscale
+      ? 'Multiscale preview: cyan = treble edge, amber = bass edge. <b>Easiest route: download the STEP</b> — it is the complete fanned solid, no sketch alignment needed. If you would rather build it by hand, use the <b>SVG·Treble</b> / <b>SVG·Bass</b> (or DXF) buttons; both are in one shared coordinate system, so import them onto the Fusion origin and they are pre-aligned in length, then separate the sketch planes by the <b>heel width</b>, loft, and cut the trapezoid taper. PDF is single-scale only.'
+      : 'Closed 2D profile: nut → sawtooth through every fret → heel → straight back along the bottom. SVG, DXF and PDF are the exact 2D side profile (PDF at true 1:1). <b>STEP</b> is the tapered solid as a real B-rep body. STL is the same geometry as a watertight mesh.';
+
+    renderProfile(currentModel);
+    renderReadout(currentModel);
+    renderFretTable(currentModel);
+    renderRadiusReadout(currentModel);
+  }
+
+  // Radius readout + safety check. The deepest cut is at the widest section
+  // (heel width). If that edge drop (sagitta) meets or exceeds the base
+  // thickness, the arc would breach the flat bottom -> warn and (in build) clamp.
+  function renderRadiusReadout(model){
+    const el = $('radiusReadout');
+    if(!el) return;
+    const p = model.params;
+    if(!p.radiused){ el.innerHTML=''; return; }
+    const boardW = Math.max(p.nutWidth, p.heelWidth);
+    const half = boardW/2;
+    const R = p.boardRadius;
+    const sagMax = (R*R - half*half) <= 0 ? R : (R - Math.sqrt(R*R - half*half));
+    const breach = sagMax >= p.baseThickness;
+    const rows = [
+      ['Radius', (R/MM_PER_IN).toFixed(2)+' in  ('+R.toFixed(1)+' mm)', R<=MIN_RADIUS_MM+1e-6],
+      ['Arc facets', String(p.arcFacets), false],
+      ['Edge drop at heel (sagitta)', sagMax.toFixed(2)+' mm', breach],
+      ['Min thickness at edge', Math.max(0, p.baseThickness - sagMax).toFixed(2)+' mm', breach],
+    ];
+    el.innerHTML = '';
+    rows.forEach(r=>{
+      const d = document.createElement('div');
+      d.className = 'r' + (r[2] ? ' warn' : '');
+      d.innerHTML = `<span>${r[0]}</span><b>${r[1]}</b>`;
+      el.appendChild(d);
+    });
+    if(breach){
+      const w = document.createElement('div');
+      w.className = 'r warn';
+      w.innerHTML = '<span style="color:var(--red)">⚠ Edge drop exceeds base thickness — increase base thickness or radius. Build will clamp to keep a solid.</span>';
+      el.appendChild(w);
+    }
+  }
+
+  function download(filename, content, mime){
+    const blob = new Blob([content], {type:mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
+
+  // Fire several downloads from one click. Browsers coalesce multiple
+  // programmatic downloads triggered in the same tick (keeping only the last),
+  // so we stagger them onto separate event-loop turns.
+  function downloadMany(files){
+    files.forEach((f, i)=>{
+      setTimeout(()=>download(f.name, f.content, f.mime), i * 400);
+    });
+  }
+
+  document.querySelectorAll('button[data-export]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!currentModel || btn.disabled) return;
+      const kind = btn.dataset.export;
+      const m = currentModel;
+      if(kind==='profile-svg'){
+        download('bond-fretboard-profile.svg', edgeSVGString(m.treble, m, 'Side profile', '#0a8f8c'), 'image/svg+xml');
+      } else if(kind==='svg-treble'){
+        download('bond-fretboard-TREBLE.svg', edgeSVGString(m.treble, m, 'TREBLE edge', '#0a8f8c'), 'image/svg+xml');
+      } else if(kind==='svg-bass'){
+        download('bond-fretboard-BASS.svg', edgeSVGString(m.bass, m, 'BASS edge', '#b3791f'), 'image/svg+xml');
+      } else if(kind==='profile-dxf'){
+        download('bond-fretboard-profile.dxf', edgeDXFString(m.treble, m, 'PROFILE'), 'application/dxf');
+      } else if(kind==='dxf-treble'){
+        download('bond-fretboard-TREBLE.dxf', edgeDXFString(m.treble, m, 'PROFILE_TREBLE'), 'application/dxf');
+      } else if(kind==='dxf-bass'){
+        download('bond-fretboard-BASS.dxf', edgeDXFString(m.bass, m, 'PROFILE_BASS'), 'application/dxf');
+      } else if(kind==='profile-pdf'){
+        download('bond-fretboard-profile.pdf', profilePDF(m), 'application/pdf');
+      } else if(kind==='step'){
+        exportSTEP(m);
+      } else if(kind==='stl'){
+        const solidTris = loftToSTL(m);
+        download('bond-fretboard.stl', stlString(solidTris,'bond_fretboard'), 'model/stl');
+        setStatus('STL written: <b>'+solidTris.length.toLocaleString()+'</b> facets, watertight mesh, millimeters. Fusion will import this as a mesh body — use the STEP button if you want a real solid.', false);
+      }
+    });
+  });
+
+  function exportSTEP(m){
+    const t0 = performance.now();
+    try{
+      const st = buildStations(m);
+      const brep = brepFromStations(st);
+      const chk = validateBrep(brep.faces);
+      const text = stepString(brep.verts, brep.faces, 'bond_fretboard');
+      download('bond-fretboard.step', text, 'model/step');
+      const ms = (performance.now()-t0).toFixed(0);
+      const kb = (text.length/1024).toFixed(0);
+      const exact = !m.params.radiused;
+      let msg = 'STEP written in '+ms+' ms · <b>'+brep.faces.length.toLocaleString()+'</b> faces, '
+              + '<b>'+brep.verts.length.toLocaleString()+'</b> vertices, '
+              + '<b>'+chk.edges.toLocaleString()+'</b> edges, '
+              + 'volume <b>'+(brep.volume/1000).toFixed(2)+' cm³</b>, '+kb+' KB. ';
+      if(chk.nonManifold){
+        msg += '<span style="color:var(--red)">⚠ '+chk.nonManifold+' non-manifold edge(s) — the solid may fail to knit. Report this parameter set.</span>';
+        setStatus(msg, true);
+      } else {
+        msg += 'Topology check: <b>manifold, closed shell</b>. '
+            + (exact
+                ? 'Flat board — geometry is <b>mathematically exact</b>.'
+                : 'Radiused — the arc is faceted into <b>'+m.params.arcFacets+'</b> planar strips across the width (still a genuine solid). Drop arc facets to 8–12 for lighter topology.')
+            + ' Open in Fusion via File → Open, or Insert → Insert Derive.';
+        setStatus(msg, false);
+      }
+      console.log('[STEP]', {faces:brep.faces.length, verts:brep.verts.length, edges:chk.edges,
+                             nonManifold:chk.nonManifold, volume_mm3:brep.volume, bytes:text.length});
+    } catch(err){
+      setStatus('<span style="color:var(--red)">STEP export failed: '+String(err && err.message || err)+'</span>', true);
+      console.error(err);
+    }
+  }
+
+  // unit toggle
+  document.querySelectorAll('.toggle-btn[data-unit]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.toggle-btn[data-unit]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      unit = btn.dataset.unit;
+      document.querySelectorAll('.u-len').forEach(u=>u.textContent = unit);
+      rebuild();
+    });
+  });
+
+  // scale-type toggle
+  document.querySelectorAll('.toggle-btn[data-scaletype]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.toggle-btn[data-scaletype]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      scaleType = btn.dataset.scaletype;
+      $('singleScaleField').classList.toggle('hidden', scaleType!=='single');
+      $('multiScaleFields').classList.toggle('hidden', scaleType!=='multi');
+      rebuild();
+    });
+  });
+
+  // radius toggle
+  document.querySelectorAll('.toggle-btn[data-radius]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.toggle-btn[data-radius]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      radiusMode = btn.dataset.radius;
+      $('radiusFields').classList.toggle('hidden', radiusMode!=='curved');
+      rebuild();
+    });
+  });
+
+  document.querySelectorAll('input[type=number]').forEach(inp=>{
+    inp.addEventListener('input', rebuild);
+  });
+  $('perpFret').addEventListener('change', rebuild);
+
+  rebuild();
+})();
+</script>
+</body>
+</html>
