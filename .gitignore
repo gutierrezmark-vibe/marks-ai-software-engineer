@@ -1,0 +1,13 @@
+# Mac system files
+.DS_Store
+
+# Secrets (passwords, API keys) - never save these in history
+.env
+.env.*
+
+# Installed dependencies and build output
+node_modules/
+__pycache__/
+.venv/
+dist/
+build/
