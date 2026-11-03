@@ -446,7 +446,7 @@
           <div id="radiusAlert"></div>
           <button class="help-toggle" data-help="helpRadius">ⓘ About the radius</button>
           <div class="help hidden" id="helpRadius">
-            The radius is a cylinder whose axis runs along the neck, so the curve is across the width; the side profile is unchanged. The crown keeps the full base thickness and the edges thin out by the sagitta. Minimum 7.25&nbsp;in (184.15&nbsp;mm). In the STEP solid the arc is faceted into this many planar strips (still a real solid, just polygonal in section). Flat mode STEP is mathematically exact.
+            The radius is a cylinder whose axis runs along the neck, so the curve is across the width; the side profile is unchanged. The crown keeps the full base thickness and the edges thin out by the sagitta. Minimum 7.25&nbsp;in (184.15&nbsp;mm). The STEP solid uses true curved surfaces (one smooth face per ramp, like a curved loft). Arc facets only set how smooth the STL and the 3D preview are. Flat mode STEP is mathematically exact.
           </div>
         </div>
       </div>
@@ -931,8 +931,10 @@
     const n = tp.length;
 
     const maxX = Math.max(...tp.map(v=>v.x), ...bp.map(v=>v.x));
+    // Unclamped: every real point has 0 <= x <= maxX, and the curved STEP
+    // takes derivatives a hair past the nut and heel, where a clamp would kink.
     function halfW(x){
-      const t = maxX>0 ? Math.min(1, Math.max(0, x/maxX)) : 0;
+      const t = maxX>0 ? x/maxX : 0;
       return (p.nutWidth + (p.heelWidth - p.nutWidth)*t) / 2;
     }
 
@@ -950,30 +952,47 @@
     const spans = p.radiused ? p.arcFacets : 1;
 
     // Bass edge sits on the -y (front) face, treble on +y (back): matches the
-    // convention fixed earlier (treble = high-E). Station s in [0..spans] runs
-    // bass(0) -> treble(1). We interpolate x per vertex and drop z by sagitta.
-    function station(s){
-      const f = s / spans;                       // 0 at bass edge, 1 at treble edge
-      const verts = [];
-      for(let i=0;i<n;i++){
-        const bx = bp[i].x, tx = tp[i].x;
-        const bz = bp[i].z;                      // z identical between edges
-        const x = bx + (tx - bx)*f;
-        const zTop = bz;
-        const hw = halfW(x);
-        const y = -hw + (2*hw)*f;
-        let z = zTop;
-        if(p.radiused && zTop > 1e-9){
-          z = zTop - sag(Math.abs(y));
-        }
-        verts.push({x, y, z});
+    // convention fixed earlier (treble = high-E). f in [0..1] runs bass(0) ->
+    // treble(1). We interpolate x per vertex and drop z by sagitta.
+    // pointAt(i, u, f) is the exact surface: u in [0..1] walks profile segment
+    // i -> i+1, and u=0 / u=1 return exactly vertex i / i+1, so the stations
+    // and the curved STEP faces agree bit for bit at shared edges.
+    function vertexAt(k, f){
+      const x = bp[k].x + (tp[k].x - bp[k].x)*f;
+      const hw = halfW(x);
+      const y = -hw + (2*hw)*f;
+      const zTop = bp[k].z;                      // z identical between edges
+      const z = (p.radiused && zTop > 1e-9) ? zTop - sag(Math.abs(y)) : zTop;
+      return {x, y, z};
+    }
+    function pointAt(i, u, f){
+      const j = (i+1)%n;
+      if(u === 0) return vertexAt(i, f);
+      if(u === 1) return vertexAt(j, f);
+      const lerp = (a,b) => a + (b - a)*u;
+      const bx = lerp(bp[i].x, bp[j].x), tx = lerp(tp[i].x, tp[j].x);
+      const x = bx + (tx - bx)*f;
+      const hw = halfW(x);
+      const y = -hw + (2*hw)*f;
+      let z;
+      if(p.radiused && bp[i].z > 1e-9 && bp[j].z > 1e-9){
+        z = lerp(bp[i].z, bp[j].z) - sag(Math.abs(y));
+      } else {
+        // Segment touching the flat bottom: straight between its two ends,
+        // exactly like the faceted strips.
+        z = lerp(vertexAt(i, f).z, vertexAt(j, f).z);
       }
+      return {x, y, z};
+    }
+    function station(s){
+      const verts = [];
+      for(let i=0;i<n;i++) verts.push(pointAt(i, 0, s/spans));
       return verts;
     }
 
     const stations = [];
     for(let s=0;s<=spans;s++) stations.push(station(s));
-    return {stations, n, spans, tp, bp};
+    return {stations, n, spans, tp, bp, pointAt};
   }
 
   // ---------- STL: triangulated skin of the stations ----------
@@ -1112,7 +1131,9 @@
   }
 
   // ---------- the STEP writer ----------
-  function stepString(verts, faces, name){
+  // stepDoc owns the file skeleton (units, product structure); buildFaces gets
+  // the entity helpers and returns the ADVANCED_FACE ids of one closed shell.
+  function stepDoc(name, buildFaces){
     let id = 0;
     const L = [];
     const A = body => { id++; L.push('#'+id+'='+body+';'); return '#'+id; };
@@ -1147,58 +1168,7 @@
     const xD  = A("DIRECTION('',(1.,0.,0.))");
     const ax0 = A(`AXIS2_PLACEMENT_3D('',${oPt},${zD},${xD})`);
 
-    // --- vertices
-    const vp = verts.map(v=>{
-      const cp = A(`CARTESIAN_POINT('',${P3(v)})`);
-      return { cp:cp, vp: A(`VERTEX_POINT('',${cp})`) };
-    });
-
-    // --- shared edges, keyed low->high so both adjacent faces reuse one EDGE_CURVE
-    const edges = new Map();
-    const edgeOf = (i,j) => {
-      const lo = Math.min(i,j), hi = Math.max(i,j);
-      const key = lo+'_'+hi;
-      let e = edges.get(key);
-      if(!e){
-        const a = verts[lo], b = verts[hi];
-        const d = {x:b.x-a.x, y:b.y-a.y, z:b.z-a.z};
-        const len = Math.hypot(d.x,d.y,d.z) || 1;
-        const lp  = A(`CARTESIAN_POINT('',${P3(a)})`);
-        const dir = A(`DIRECTION('',${P3({x:d.x/len, y:d.y/len, z:d.z/len})})`);
-        const vec = A(`VECTOR('',${dir},${num(len)})`);
-        const lin = A(`LINE('',${lp},${vec})`);
-        e = { lo:lo, ec: A(`EDGE_CURVE('',${vp[lo].vp},${vp[hi].vp},${lin},.T.)`) };
-        edges.set(key, e);
-      }
-      return e;
-    };
-
-    // --- faces
-    const faceIds = faces.map(f=>{
-      const pts = f.map(i=>verts[i]);
-      const nrm = newell(pts);
-      // Any unit vector perpendicular to nrm works as the plane's ref direction.
-      const t = (Math.abs(nrm.z) < 0.9) ? {x:0,y:0,z:1} : {x:1,y:0,z:0};
-      let r = { x:t.y*nrm.z - t.z*nrm.y, y:t.z*nrm.x - t.x*nrm.z, z:t.x*nrm.y - t.y*nrm.x };
-      const rl = Math.hypot(r.x,r.y,r.z) || 1;
-      r = {x:r.x/rl, y:r.y/rl, z:r.z/rl};
-
-      const loc = A(`CARTESIAN_POINT('',${P3(pts[0])})`);
-      const nd  = A(`DIRECTION('',${P3(nrm)})`);
-      const rd  = A(`DIRECTION('',${P3(r)})`);
-      const plc = A(`AXIS2_PLACEMENT_3D('',${loc},${nd},${rd})`);
-      const pln = A(`PLANE('',${plc})`);
-
-      const oe = f.map((vi,k)=>{
-        const vj = f[(k+1)%f.length];
-        const e  = edgeOf(vi,vj);
-        return A(`ORIENTED_EDGE('',*,*,${e.ec},${e.lo===vi ? '.T.' : '.F.'})`);
-      });
-      const loop  = A(`EDGE_LOOP('',(${oe.join(',')}))`);
-      const bound = A(`FACE_OUTER_BOUND('',${loop},.T.)`);
-      return A(`ADVANCED_FACE('',(${bound}),${pln},.T.)`);
-    });
-
+    const faceIds = buildFaces({A, num, P3});
     const shell = A(`CLOSED_SHELL('',(${faceIds.join(',')}))`);
     const brep  = A(`MANIFOLD_SOLID_BREP('${name}',${shell})`);
     const absr  = A(`ADVANCED_BREP_SHAPE_REPRESENTATION('',(${ax0},${brep}),${ctx})`);
@@ -1229,6 +1199,192 @@
       'END-ISO-10303-21;',
       ''
     ].join('\n');
+  }
+
+  // A plane through pts[0] with the given unit normal.
+  function stepPlane(A, P3, origin, nrm){
+    // Any unit vector perpendicular to nrm works as the plane's ref direction.
+    const t = (Math.abs(nrm.z) < 0.9) ? {x:0,y:0,z:1} : {x:1,y:0,z:0};
+    let r = { x:t.y*nrm.z - t.z*nrm.y, y:t.z*nrm.x - t.x*nrm.z, z:t.x*nrm.y - t.y*nrm.x };
+    const rl = Math.hypot(r.x,r.y,r.z) || 1;
+    r = {x:r.x/rl, y:r.y/rl, z:r.z/rl};
+    const loc = A(`CARTESIAN_POINT('',${P3(origin)})`);
+    const nd  = A(`DIRECTION('',${P3(nrm)})`);
+    const rd  = A(`DIRECTION('',${P3(r)})`);
+    return A(`PLANE('',${A(`AXIS2_PLACEMENT_3D('',${loc},${nd},${rd})`)})`);
+  }
+
+  // Straight EDGE_CURVE from vertex a to vertex b.
+  function stepLineEdge(A, P3, num, pa, pb, va, vb){
+    const d = {x:pb.x-pa.x, y:pb.y-pa.y, z:pb.z-pa.z};
+    const len = Math.hypot(d.x,d.y,d.z) || 1;
+    const lp  = A(`CARTESIAN_POINT('',${P3(pa)})`);
+    const dir = A(`DIRECTION('',${P3({x:d.x/len, y:d.y/len, z:d.z/len})})`);
+    const lin = A(`LINE('',${lp},${A(`VECTOR('',${dir},${num(len)})`)})`);
+    return A(`EDGE_CURVE('',${va},${vb},${lin},.T.)`);
+  }
+
+  // Faceted / flat solid: every face planar, every edge a line.
+  function stepString(verts, faces, name){
+    return stepDoc(name, ({A, num, P3}) => {
+      const vp = verts.map(v => A(`VERTEX_POINT('',${A(`CARTESIAN_POINT('',${P3(v)})`)})`));
+
+      // Shared edges, keyed low->high so both adjacent faces reuse one EDGE_CURVE.
+      const edges = new Map();
+      const edgeOf = (i,j) => {
+        const lo = Math.min(i,j), hi = Math.max(i,j);
+        const key = lo+'_'+hi;
+        let e = edges.get(key);
+        if(!e){
+          e = { start:lo, ec: stepLineEdge(A, P3, num, verts[lo], verts[hi], vp[lo], vp[hi]) };
+          edges.set(key, e);
+        }
+        return e;
+      };
+
+      return faces.map(f=>{
+        const pts = f.map(i=>verts[i]);
+        const pln = stepPlane(A, P3, pts[0], newell(pts));
+        return stepFace(A, f.map((vi,k)=>edgeOf(vi, f[(k+1)%f.length])), f, pln, true);
+      });
+    });
+  }
+
+  function stepFace(A, edgeList, loopVerts, surf, sameSense){
+    const oe = edgeList.map((e,k)=>A(`ORIENTED_EDGE('',*,*,${e.ec},${e.start===loopVerts[k] ? '.T.' : '.F.'})`));
+    const loop  = A(`EDGE_LOOP('',(${oe.join(',')}))`);
+    const bound = A(`FACE_OUTER_BOUND('',${loop},.T.)`);
+    return A(`ADVANCED_FACE('',(${bound}),${surf},${sameSense ? '.T.' : '.F.'})`);
+  }
+
+  // ---------- radiused STEP: true curved surfaces ----------
+  // Faceting the arc turns every ramp into arcFacets planar strips: a heavy
+  // file that is still polygonal in section, which CAM and quoting engines
+  // dislike. Instead each profile segment becomes ONE face across the full
+  // width: a bicubic B-spline built by Hermite interpolation of the exact
+  // surface (pointAt), or a PLANE when the segment is flat (risers, ends and
+  // bottom on a single-scale board). Edges are the boundary rows/columns of
+  // those patches, so neighbouring faces share them exactly and the shell knits.
+  const ARC_SPANS = 8;    // cubic spans across the width
+  const RUN_SPANS = 1;    // cubic spans along one segment
+
+  function bsplineKnots(spans){
+    const mult = [4], knots = [0];
+    for(let k=1;k<spans;k++){ mult.push(3); knots.push(k/spans); }
+    mult.push(4); knots.push(1);
+    return {mult, knots};
+  }
+
+  function stepStringCurved(st, name){
+    const {n, pointAt} = st;
+    const sub = (a,b) => ({x:a.x-b.x, y:a.y-b.y, z:a.z-b.z});
+    const dot = (a,b) => a.x*b.x + a.y*b.y + a.z*b.z;
+    const crs = (a,b) => ({x:a.y*b.z-a.z*b.y, y:a.z*b.x-a.x*b.z, z:a.x*b.y-a.y*b.x});
+
+    // Value, first derivatives and twist of segment i at (u,f), by central
+    // differences (the twist needs a wider step to stay clear of round-off).
+    const H = 1e-5, HT = 1e-3;
+    function node(i, u, f){
+      const d = (a,b,h) => { const v = sub(a,b); return {x:v.x/(2*h), y:v.y/(2*h), z:v.z/(2*h)}; };
+      const tw = sub(sub(pointAt(i,u+HT,f+HT), pointAt(i,u+HT,f-HT)), sub(pointAt(i,u-HT,f+HT), pointAt(i,u-HT,f-HT)));
+      return {
+        P:  pointAt(i,u,f),
+        Pu: d(pointAt(i,u+H,f), pointAt(i,u-H,f), H),
+        Pf: d(pointAt(i,u,f+H), pointAt(i,u,f-H), H),
+        Puf:{x:tw.x/(4*HT*HT), y:tw.y/(4*HT*HT), z:tw.z/(4*HT*HT)},
+      };
+    }
+    // Bezier control net of segment i: net[r][c], r steps along the segment (u),
+    // c across the width (f).
+    // Row 0 / last and column 0 / last only use values and in-edge derivatives,
+    // so a boundary is identical whichever neighbouring face computes it.
+    function controlNet(i){
+      const du = 1/RUN_SPANS, df = 1/ARC_SPANS;
+      const nodes = [];
+      for(let a=0;a<=RUN_SPANS;a++){
+        nodes.push([]);
+        for(let b=0;b<=ARC_SPANS;b++) nodes[a].push(node(i, a*du, b*df));
+      }
+      const pick = r => r%3===0 ? [r/3, 0] : r%3===1 ? [(r-1)/3, 1] : [(r+1)/3, -1];
+      const net = [];
+      for(let r=0;r<=3*RUN_SPANS;r++){
+        const [a, su] = pick(r), row = [];
+        for(let c=0;c<=3*ARC_SPANS;c++){
+          const [b, sf] = pick(c), N = nodes[a][b];
+          const ku = su*du/3, kf = sf*df/3;
+          row.push({
+            x: N.P.x + ku*N.Pu.x + kf*N.Pf.x + ku*kf*N.Puf.x,
+            y: N.P.y + ku*N.Pu.y + kf*N.Pf.y + ku*kf*N.Puf.y,
+            z: N.P.z + ku*N.Pu.z + kf*N.Pf.z + ku*kf*N.Puf.z,
+          });
+        }
+        net.push(row);
+      }
+      return net;
+    }
+    const nets = [];
+    for(let i=0;i<n;i++) nets.push(controlNet(i));
+
+    // Corner vertices: id = 2*k + side (side 0 = bass edge, 1 = treble edge).
+    const corner = [];
+    for(let k=0;k<n;k++){ corner.push(pointAt(k,0,0)); corner.push(pointAt(k,0,1)); }
+
+    // Same topology as the faceted solid with a single span; orient it outward.
+    const faces = [];
+    faces.push([...Array(n).keys()].map(k=>2*k).reverse());
+    faces.push([...Array(n).keys()].map(k=>2*k+1));
+    for(let i=0;i<n;i++){ const j=(i+1)%n; faces.push([2*i, 2*j, 2*j+1, 2*i+1]); }
+    fixOutward(corner, faces);
+    const chk = validateBrep(faces);
+
+    return { chk, faces: faces.length, text: stepDoc(name, ({A, num, P3}) => {
+      const vp = corner.map(v => A(`VERTEX_POINT('',${A(`CARTESIAN_POINT('',${P3(v)})`)})`));
+      const pts = list => list.map(p => A(`CARTESIAN_POINT('',${P3(p)})`)).join(',');
+      const knotStr = spans => { const k = bsplineKnots(spans); return [k.mult.join(','), k.knots.map(num).join(',')]; };
+
+      // A run of control points becomes a LINE if it is straight, else a cubic B-spline.
+      function edgeFrom(ctrl, va, vb, spans){
+        const a = ctrl[0], b = ctrl[ctrl.length-1], ab = sub(b,a), L2 = dot(ab,ab) || 1;
+        const straight = ctrl.every(p=>{ const ap = sub(p,a), t = dot(ap,ab)/L2; return Math.hypot(ap.x-t*ab.x, ap.y-t*ab.y, ap.z-t*ab.z) < 1e-7; });
+        if(straight) return stepLineEdge(A, P3, num, a, b, vp[va], vp[vb]);
+        const [m, k] = knotStr(spans);
+        const crv = A(`B_SPLINE_CURVE_WITH_KNOTS('',3,(${pts(ctrl)}),.UNSPECIFIED.,.F.,.F.,(${m}),(${k}),.UNSPECIFIED.)`);
+        return A(`EDGE_CURVE('',${vp[va]},${vp[vb]},${crv},.T.)`);
+      }
+      const edges = new Map();
+      function edgeOf(a, b){
+        const lo = Math.min(a,b), hi = Math.max(a,b), key = lo+'_'+hi;
+        let e = edges.get(key);
+        if(e) return e;
+        const ka = lo>>1, kb = hi>>1;
+        if(ka === kb){
+          // Across the width at profile vertex ka: first row of its segment's net.
+          e = { start:lo, ec: edgeFrom(nets[ka][0], lo, hi, ARC_SPANS) };
+        } else {
+          // Along a side: segment i runs vertex i -> i+1 (wrapping at the end).
+          const side = lo & 1, i = ((kb - ka + n) % n === 1) ? ka : kb;
+          const col = nets[i].map(row => row[side ? row.length-1 : 0]);
+          const start = 2*i + side;
+          e = { start, ec: edgeFrom(col, start, 2*((i+1)%n) + side, RUN_SPANS) };
+        }
+        edges.set(key, e);
+        return e;
+      }
+
+      return faces.map((f, fi)=>{
+        const edgeList = f.map((v,k)=>edgeOf(v, f[(k+1)%f.length]));
+        const outward = newell(f.map(v=>corner[v]));
+        if(fi < 2) return stepFace(A, edgeList, f, stepPlane(A, P3, corner[f[0]], outward), true);
+        const net = nets[fi - 2];
+        // Flat within 1e-7 mm -> a plane; otherwise the B-spline patch itself.
+        const flat = net.every(row=>row.every(p=>Math.abs(dot(sub(p, net[0][0]), outward)) < 1e-7));
+        if(flat) return stepFace(A, edgeList, f, stepPlane(A, P3, net[0][0], outward), true);
+        const [mu, ku] = knotStr(RUN_SPANS), [mf, kf] = knotStr(ARC_SPANS);
+        const srf = A(`B_SPLINE_SURFACE_WITH_KNOTS('',3,3,(${net.map(row=>'('+pts(row)+')').join(',')}),.UNSPECIFIED.,.F.,.F.,.F.,(${mu}),(${mf}),(${ku}),(${kf}),.UNSPECIFIED.)`);
+        const mid = node(fi - 2, 0.5, 0.5);
+        return stepFace(A, edgeList, f, srf, dot(crs(mid.Pu, mid.Pf), outward) > 0);
+      });
+    }) };
   }
 
 
@@ -1483,7 +1639,7 @@
       `<div><span>Radius</span><b>${(p.boardRadius/MM_PER_IN).toFixed(2)} in</b></div>` +
       `<div class="${breach?'warn':''}"><span>Edge drop at heel</span><b>${L(sagMax)}</b></div>` +
       `<div class="${breach?'warn':''}"><span>Min. edge thickness</span><b>${L(Math.max(0, p.baseThickness - sagMax))}</b></div>` +
-      `<div><span>Arc facets</span><b>${p.arcFacets}</b></div>`;
+      `<div><span>Arc facets (STL)</span><b>${p.arcFacets}</b></div>`;
     $('radiusAlert').innerHTML = breach
       ? '<div class="alert">⚠ The radius drops the board edges more than the thinnest point allows. Increase the full height or the radius — the export clamps the curve to keep a solid board.</div>' : '';
   }
@@ -1799,7 +1955,11 @@
   function baseName(m){
     const p = m.params;
     const sc = p.multiscale ? `${p.trebleScale.toFixed(0)}-${p.bassScale.toFixed(0)}mm` : `${p.trebleScale.toFixed(0)}mm`;
-    return `bond-fretboard-${sc}-${p.numFrets}f`;
+    // Radius in inches (how luthiers quote it), e.g. 12in-radius, 9.5in-radius.
+    const rad = p.radiused ? `${trimNum(p.boardRadius/MM_PER_IN, 2)}in-radius` : 'flat';
+    const d = new Date(), two = v => String(v).padStart(2,'0');
+    const date = `${two(d.getDate())}-${two(d.getMonth()+1)}-${d.getFullYear()}`;   // day-month-year
+    return `bond-fretboard-${sc}-${p.numFrets}f-${rad}-${date}`;
   }
 
   document.addEventListener('click', e=>{
@@ -1828,24 +1988,30 @@
     const t0 = performance.now();
     try{
       const st = buildStations(m);
-      const brep = brepFromStations(st);
-      const chk = validateBrep(brep.faces);
-      const text = stepString(brep.verts, brep.faces, 'bond_fretboard');
+      let text, nFaces, chk, volume;
+      if(m.params.radiused){
+        const c = stepStringCurved(st, 'bond_fretboard');
+        text = c.text; nFaces = c.faces; chk = c.chk; volume = m.volume;
+      } else {
+        const brep = brepFromStations(st);
+        chk = validateBrep(brep.faces);
+        text = stepString(brep.verts, brep.faces, 'bond_fretboard');
+        nFaces = brep.faces.length; volume = brep.volume;
+      }
       download(filename, text, 'model/step');
       const ms = (performance.now()-t0).toFixed(0);
       const kb = (text.length/1024).toFixed(0);
-      const exact = !m.params.radiused;
-      let msg = 'STEP written in '+ms+' ms · <b>'+brep.faces.length.toLocaleString()+'</b> faces, '
-              + '<b>'+brep.verts.length.toLocaleString()+'</b> vertices, '
+      let msg = 'STEP written in '+ms+' ms · <b>'+nFaces.toLocaleString()+'</b> faces, '
               + '<b>'+chk.edges.toLocaleString()+'</b> edges, '
-              + 'volume <b>'+(brep.volume/1000).toFixed(2)+' cm³</b>, '+kb+' KB. ';
+              + 'volume <b>'+(volume/1000).toFixed(2)+' cm³</b>, '+kb+' KB. ';
       if(chk.nonManifold){
         msg += '⚠ '+chk.nonManifold+' non-manifold edge(s) — the solid may fail to knit. Try slightly different settings.';
         setStatus(msg, true); toast('STEP saved with warnings', true);
       } else {
         msg += 'Topology check: <b>manifold, closed shell</b>. '
-            + (exact ? 'Flat board — geometry is <b>mathematically exact</b>.'
-                     : 'Radiused — the arc is faceted into <b>'+m.params.arcFacets+'</b> planar strips across the width (still a genuine solid). Drop arc facets to 8–12 for lighter topology.')
+            + (m.params.radiused
+                ? 'Radiused — each ramp is <b>one smooth curved face</b> across the full width (within 0.001 mm of the true radius), like a curved loft in Fusion.'
+                : 'Flat board — geometry is <b>mathematically exact</b>.')
             + ' Open in Fusion via File → Open, or Insert → Insert Derive.';
         setStatus(msg, false); toast('Saved '+filename);
       }
