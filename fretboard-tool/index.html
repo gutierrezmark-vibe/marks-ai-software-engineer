@@ -340,9 +340,10 @@
     </div>
   </div>
   <div class="bar-tools">
-    <select id="preset" aria-label="Load a preset">
+    <select id="preset" aria-label="Presets: load, save, export or import">
       <option value="">Presets…</option>
     </select>
+    <input type="file" id="presetFile" accept=".json,application/json" hidden>
     <div class="seg" role="group" aria-label="Units">
       <button data-unit="mm" aria-pressed="true">mm</button>
       <button data-unit="in" aria-pressed="false">inch</button>
@@ -2429,9 +2430,119 @@
   //  WIRING
   // ================================================================
   buildControls();
-  PRESETS.forEach((p,i)=>{ const o = document.createElement('option'); o.value = i; o.textContent = p.name; $('preset').appendChild(o); });
+  // ---------- presets: built-in, mine (this browser), and preset files ----------
+  // My presets live in this browser's localStorage. A preset file is
+  // {app:'stepboard', version:1, name, settings} and is checked field by field
+  // on import, since it may come from anyone.
+  const MY_PRESETS_KEY = 'stepboard.presets';
+  const CHOICES = {
+    unit:['mm','in'], scaleType:['single','multi'], radiusMode:['flat','curved'],
+    stepDir:['rising','falling'], wood: WOODS.map(w=>w.id),
+  };
+  function loadMyPresets(){
+    try{ const a = JSON.parse(localStorage.getItem(MY_PRESETS_KEY) || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; }
+  }
+  function storeMyPresets(list){
+    try{ localStorage.setItem(MY_PRESETS_KEY, JSON.stringify(list)); return true; }
+    catch(e){ toast('This browser is not allowing saved presets (private window?)', true); return false; }
+  }
+  function currentSettings(){
+    const st = {perpChoice:S.perpChoice, vals:{...S.vals}};
+    Object.keys(CHOICES).forEach(k=>st[k] = S[k]);
+    return st;
+  }
+  // Keep only known settings, in range; anything missing falls back to the defaults.
+  function cleanSettings(raw){
+    if(!raw || typeof raw !== 'object' || !raw.vals || typeof raw.vals !== 'object') return null;
+    const d = DEFAULT_STATE(), out = {vals:{}};
+    Object.keys(CHOICES).forEach(k=>{ out[k] = CHOICES[k].includes(raw[k]) ? raw[k] : d[k]; });
+    out.perpChoice = /^(nut|bridge|\d{1,2})$/.test(String(raw.perpChoice)) ? String(raw.perpChoice) : d.perpChoice;
+    Object.entries(SPECS).forEach(([k,spec])=>{
+      const v = raw.vals[k];
+      out.vals[k] = (typeof v === 'number' && isFinite(v)) ? Math.min(spec.max, Math.max(spec.min, v)) : d.vals[k];
+    });
+    return out;
+  }
+  function applySettings(st){
+    Object.keys(CHOICES).forEach(k=>S[k] = st[k]);
+    S.perpChoice = st.perpChoice; lastPerpN = -1;
+    S.vals = {...st.vals};
+    syncModes(); syncAllControls(); rebuild();
+  }
+  function cleanName(n){ return String(n || '').replace(/[\x00-\x1f]/g,'').trim().slice(0, 60); }
+
+  function buildPresetMenu(){
+    const sel = $('preset'), mine = loadMyPresets();
+    sel.textContent = '';
+    const opt = (parent, value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; parent.appendChild(o); };
+    const group = label => { const g = document.createElement('optgroup'); g.label = label; sel.appendChild(g); return g; };
+    opt(sel, '', 'Presets…');
+    const builtIn = group('Built-in');
+    PRESETS.forEach((p,i)=>opt(builtIn, 'b:'+i, p.name));
+    if(mine.length){ const g = group('My presets (this browser)'); mine.forEach((p,i)=>opt(g, 'm:'+i, p.name)); }
+    const acts = group('Actions');
+    opt(acts, 'save', '＋ Save current settings as a preset…');
+    opt(acts, 'export', '⇩ Export current settings to a file');
+    opt(acts, 'import', '⇧ Import a preset file…');
+    if(mine.length) opt(acts, 'delete', '✕ Delete one of my presets…');
+    sel.value = '';
+  }
+
+  function savePreset(){
+    const name = cleanName(prompt('Name for this preset:', ''));
+    if(!name) return;
+    const list = loadMyPresets(), at = list.findIndex(p=>p.name === name);
+    if(at >= 0 && !confirm(`Replace your preset "${name}"?`)) return;
+    const entry = {name, settings: currentSettings()};
+    if(at >= 0) list[at] = entry; else list.push(entry);
+    if(storeMyPresets(list)){ buildPresetMenu(); toast('Saved preset '+name); }
+  }
+  function deletePreset(){
+    const list = loadMyPresets(); if(!list.length) return;
+    const pick = prompt('Delete which preset? Type its number:\n\n' + list.map((p,i)=>`${i+1}. ${p.name}`).join('\n'), '');
+    const i = parseInt(pick, 10) - 1;
+    if(!(i >= 0 && i < list.length)) return;
+    if(!confirm(`Delete "${list[i].name}"? This can't be undone.`)) return;
+    const name = list[i].name; list.splice(i, 1);
+    if(storeMyPresets(list)){ buildPresetMenu(); toast('Deleted '+name); }
+  }
+  function exportPreset(){
+    if(!currentModel) return;
+    const file = baseName(currentModel, 'preset') + '.json';
+    const doc = {app:'stepboard', version:1, name: file.replace(/\.json$/, ''), settings: currentSettings()};
+    download(file, JSON.stringify(doc, null, 2), 'application/json');
+    toast('Saved '+file);
+  }
+  function importPresetFile(file){
+    if(!file) return;
+    if(file.size > 100000){ toast('That file is too big to be a Stepboard preset', true); return; }
+    file.text().then(text=>{
+      let doc; try{ doc = JSON.parse(text); }catch(e){ doc = null; }
+      const st = doc && doc.app === 'stepboard' ? cleanSettings(doc.settings) : null;
+      if(!st){ toast('Not a Stepboard preset file', true); return; }
+      const name = cleanName(doc.name) || cleanName(file.name.replace(/\.json$/i, '')) || 'Imported preset';
+      const list = loadMyPresets(), at = list.findIndex(p=>p.name === name);
+      const entry = {name, settings: st};
+      if(at >= 0) list[at] = entry; else list.push(entry);
+      storeMyPresets(list);
+      buildPresetMenu(); applySettings(st);
+      toast('Imported and loaded '+name);
+    });
+  }
+
+  buildPresetMenu();
   $('preset').addEventListener('change', e=>{
-    const p = PRESETS[e.target.value]; if(!p) return;
+    const v = e.target.value; e.target.value = '';
+    if(v === 'save') return savePreset();
+    if(v === 'export') return exportPreset();
+    if(v === 'import'){ $('presetFile').value = ''; $('presetFile').click(); return; }
+    if(v === 'delete') return deletePreset();
+    if(v.startsWith('m:')){
+      const p = loadMyPresets()[+v.slice(2)], st = p && cleanSettings(p.settings);
+      if(!st){ toast('That preset could not be read', true); return; }
+      applySettings(st); toast('Loaded '+p.name); return;
+    }
+    const p = PRESETS[+v.slice(2)]; if(!p) return;
     S.scaleType = p.st;
     if(p.v.numStrings) [S.vals.eeNut, S.vals.eeBridge] = STRING_SPREAD[p.v.numStrings];
     Object.assign(S.vals, p.v);
@@ -2439,8 +2550,8 @@
     if(p.radius) S.radiusMode = p.radius;
     syncModes(); syncAllControls(); rebuild();
     toast('Loaded '+p.name);
-    e.target.value = '';
   });
+  $('presetFile').addEventListener('change', e=>importPresetFile(e.target.files[0]));
 
   document.querySelectorAll('[data-unit]').forEach(b=>b.addEventListener('click', ()=>{
     S.unit = b.dataset.unit; syncModes(); syncAllControls(); rebuild();
@@ -2460,7 +2571,7 @@
   $('stringsBtn').addEventListener('click', ()=>{ S.showStrings = !S.showStrings; $('stringsBtn').setAttribute('aria-pressed', String(S.showStrings)); if(currentModel) update3D(currentModel); });
   $('spinBtn').addEventListener('click', ()=>{ S.spin = !S.spin; $('spinBtn').setAttribute('aria-pressed', String(S.spin)); });
   $('viewResetBtn').addEventListener('click', fit3D);
-  $('csvBtn').addEventListener('click', ()=>{ if(!currentModel) return; const f = baseName(currentModel)+'-frets.csv'; download(f, fretCSV(currentModel), 'text/csv'); toast('Saved '+f); });
+  $('csvBtn').addEventListener('click', ()=>{ if(!currentModel) return; const f = baseName(currentModel, 'frets')+'.csv'; download(f, fretCSV(currentModel), 'text/csv'); toast('Saved '+f); });
   $('themeBtn').addEventListener('click', ()=>{
     theme = theme==='dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = theme;
