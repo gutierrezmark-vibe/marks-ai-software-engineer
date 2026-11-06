@@ -266,7 +266,7 @@
   .export-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
   .export-head h2{margin:0; font-size:15px; font-weight:600;}
   .export-head p{margin:0; font-size:12px; color:var(--ink-3);}
-  .tiles{display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:12px;}
+  .tiles{display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:12px;}
   @media (max-width:1300px){ .tiles{grid-template-columns:repeat(3, minmax(0,1fr));} }
   @media (max-width:640px){ .tiles{grid-template-columns:1fr 1fr;} }
   @media (max-width:420px){ .tiles{grid-template-columns:1fr;} }
@@ -541,6 +541,11 @@
           <div class="fmt">PDF</div>
           <div class="desc" id="pdfDesc">Side profile drawn at true 1:1 scale.</div>
           <div class="acts"><button class="dl" data-export="profile-pdf" id="btnPdf">Download</button></div>
+        </div>
+        <div class="tile">
+          <div class="fmt">PDF · TOP</div>
+          <div class="desc">Top view with every fret line. <b>Drawing</b>: dimensioned sheet to send with a quote. <b>1:1</b>: true-size template across Letter pages you tape together.</div>
+          <div class="acts"><button class="dl" data-export="top-drawing">Drawing</button><button class="dl" data-export="top-template">1:1</button></div>
         </div>
       </div>
       <div class="statusbar" id="statusbar"><span class="dot"></span><span id="statusText">Ready. The STEP file is a watertight <b>MANIFOLD_SOLID_BREP</b> — open it in Fusion with File → Open (or Insert → Insert Derive) and it arrives as a real body. No mesh conversion involved.</span></div>
@@ -880,7 +885,8 @@
 
   // ---------- PDF (hand-written, true 1:1: 1 mm = 72/25.4 pt; single scale only) ----------
   const MM2PT = 72/25.4;
-  function profilePDF(model){
+  // name: the export base name, so the PDF is titled like its STEP file.
+  function profilePDF(model, name, fileStem){
     const poly = model.treble.polygon;
     const maxX = Math.max(...poly.map(p=>p.x));
     const maxZ = Math.max(...poly.map(p=>p.z));
@@ -897,17 +903,25 @@
     });
     content += 'h\nS\n';
     content += 'BT /F1 8 Tf 0 0 0 rg ';
-    content += `${ox.toFixed(2)} ${(pageH-14).toFixed(2)} Td (Bond fretboard side profile - printed at 1:1 scale, millimeters) Tj ET\n`;
+    content += `${ox.toFixed(2)} ${(pageH-14).toFixed(2)} Td (${name || 'Bond fretboard'} - side profile, printed at 1:1 scale, millimeters) Tj ET\n`;
 
-    return buildPDF(pageW, pageH, content);
+    return buildPDF(pageW, pageH, content, fileStem || (name || 'bond-fretboard') + '-profile-1to1');
   }
-  function buildPDF(pageW, pageH, content){
+  // One or more pages of the same size. Fonts: F1 Helvetica, F2 Helvetica-Bold.
+  // Content must be plain ASCII so string length = byte length for the xref.
+  function buildPDF(pageW, pageH, contents, title){
+    if(!Array.isArray(contents)) contents = [contents];
     const objs = [];
     objs.push('<< /Type /Catalog /Pages 2 0 R >>');
-    objs.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW.toFixed(2)} ${pageH.toFixed(2)}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`);
-    objs.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    objs.push(`<< /Type /Pages /Kids [${contents.map((_,i)=>(5+2*i)+' 0 R').join(' ')}] /Count ${contents.length} >>`);
     objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+    contents.forEach((content,i)=>{
+      objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW.toFixed(2)} ${pageH.toFixed(2)}] /Contents ${6+2*i} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>`);
+      objs.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    });
+    const pdfStr = t => '(' + String(t).replace(/[^\x20-\x7e]/g,'?').replace(/[\\()]/g, ch=>'\\'+ch) + ')';
+    objs.push(`<< /Title ${pdfStr(title || 'Bond fretboard')} /Creator (Stepboard) >>`);
 
     let pdf = '%PDF-1.4\n';
     const offsets = [];
@@ -918,8 +932,255 @@
     const xrefStart = pdf.length;
     pdf += `xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;
     offsets.forEach(off=>{ pdf += String(off).padStart(10,'0') + ' 00000 n \n'; });
-    pdf += `trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+    pdf += `trailer\n<< /Size ${objs.length+1} /Root 1 0 R /Info ${objs.length} 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
     return pdf;
+  }
+
+  // Minimal content-stream writer in PDF points (y up).
+  function pdfPage(){
+    let c = '';
+    const f = v => v.toFixed(2);
+    const esc = s => '(' + String(s).replace(/[^\x20-\x7e]/g,'?').replace(/[\\()]/g, ch=>'\\'+ch) + ')';
+    // Helvetica averages ~0.54 em per glyph; close enough to centre labels.
+    const textW = (s, size) => String(s).length * size * 0.54;
+    return {
+      get content(){ return c; },
+      raw(t){ c += t + '\n'; },
+      stroke(w, gray){ c += `${f(w)} w ${gray||0} G [] 0 d\n`; },
+      dash(on, off){ c += `[${on} ${off}] 0 d\n`; },
+      line(x1,y1,x2,y2){ c += `${f(x1)} ${f(y1)} m ${f(x2)} ${f(y2)} l S\n`; },
+      poly(pts, close){ pts.forEach((q,i)=>{ c += `${f(q[0])} ${f(q[1])} ${i?'l':'m'}\n`; }); c += close ? 'h S\n' : 'S\n'; },
+      rect(x,y,w,h){ c += `${f(x)} ${f(y)} ${f(w)} ${f(h)} re S\n`; },
+      clip(x,y,w,h){ c += `q ${f(x)} ${f(y)} ${f(w)} ${f(h)} re W n\n`; },
+      unclip(){ c += 'Q\n'; },
+      // Filled arrow head at (x,y) pointing along (dx,dy).
+      arrow(x,y,dx,dy){
+        const L = Math.hypot(dx,dy)||1, ux = dx/L, uy = dy/L, s = 4, w = 1.6;
+        c += `0 g ${f(x)} ${f(y)} m ${f(x-ux*s-uy*w)} ${f(y-uy*s+ux*w)} l ${f(x-ux*s+uy*w)} ${f(y-uy*s-ux*w)} l h f\n`;
+      },
+      text(x, y, s, size, o={}){
+        let tx = x;
+        if(!o.rot){ if(o.align==='center') tx -= textW(s,size)/2; else if(o.align==='right') tx -= textW(s,size); }
+        const font = o.bold ? 'F2' : 'F1';
+        const m = o.rot ? `0 1 -1 0 ${f(x)} ${f(y - (o.align==='center' ? textW(s,size)/2 : 0))} Tm` : `1 0 0 1 ${f(tx)} ${f(y)} Tm`;
+        c += `BT /${font} ${size} Tf ${o.gray||0} g ${m} ${esc(s)} Tj ET\n`;
+      },
+    };
+  }
+
+  // ---------- top view (dimensioned drawing + tiled 1:1 template) ----------
+  // The board seen from above: nut on the left, treble edge at the top. Fret
+  // lines are built exactly like the solid's cross sections (x runs bass ->
+  // treble, y = -halfW + 2*halfW*f), so the PDFs line up with the STEP.
+  function topView(m){
+    const p = m.params, tb = m.treble, bs = m.bass;
+    const maxX = Math.max(...tb.polygon.map(v=>v.x), ...bs.polygon.map(v=>v.x));
+    const halfW = x => (p.nutWidth + (p.heelWidth - p.nutWidth)*(maxX>0 ? x/maxX : 0))/2;
+    const across = (bx, tx) => Array.from({length:9}, (_,i)=>{
+      const f = i/8, x = bx + (tx - bx)*f, hw = halfW(x);
+      return [x, -hw + 2*hw*f];
+    });
+    const lastT = tb.profile[tb.profile.length-1].x, lastB = bs.profile[bs.profile.length-1].x;
+    const nutLine = across(bs.fretX[0], tb.fretX[0]), heelLine = across(lastB, lastT);
+    const frets = [];
+    for(let k=1;k<=p.numFrets;k++) frets.push({k, pts:across(bs.fretX[k], tb.fretX[k]), treble:tb.fretXRaw[k], bass:bs.fretXRaw[k]});
+    const pc = p.perpChoice;
+    const perpK = !p.multiscale ? null : pc==='nut' ? 0 : pc==='bridge' ? null : parseInt(pc);
+    return {
+      p, maxX, maxHW: Math.max(p.nutWidth, p.heelWidth)/2, frets, nutLine, heelLine, perpK,
+      outline: [nutLine[0], ...heelLine, ...nutLine.slice().reverse()],
+      lenT: lastT - tb.fretX[0], lenB: lastB - bs.fretX[0],
+    };
+  }
+  function todayDMY(){
+    const d = new Date(), two = v => String(v).padStart(2,'0');
+    return `${two(d.getDate())}-${two(d.getMonth()+1)}-${d.getFullYear()}`;
+  }
+  function topSpecLines(tv){
+    const p = tv.p, mm = v => v.toFixed(2), inch = v => (v/MM_PER_IN).toFixed(3);
+    const perp = tv.p.multiscale ? (tv.perpK===null ? 'Bridge' : tv.perpK===0 ? 'Nut' : 'Fret '+tv.perpK) : null;
+    return [
+      p.multiscale ? `Scale: treble ${mm(p.trebleScale)} / bass ${mm(p.bassScale)} mm (perpendicular at ${perp})`
+                   : `Scale: ${mm(p.trebleScale)} mm (${inch(p.trebleScale)} in)`,
+      `Frets: ${p.numFrets}    Nut width: ${mm(p.nutWidth)}    Heel width: ${mm(p.heelWidth)}`,
+      `Radius: ${p.radiused ? mm(p.boardRadius)+' mm ('+trimNum(p.boardRadius/MM_PER_IN,2)+' in)' : 'flat'}`,
+      `Full height: ${mm(p.baseThickness+p.fretHeight)}    Step height: ${mm(p.fretHeight)}`,
+      `Steps: ${p.stepDir==='falling' ? 'ramp down from each fret edge' : 'ramp up to each fret edge (Bond)'}`,
+    ];
+  }
+
+  // One Letter-landscape sheet, scaled to fit, with dimensions, a fret table,
+  // notes and a title block. This is the drawing to send with a quote.
+  function topDrawingPDF(m, name, fileStem){
+    name = name || 'bond-fretboard';
+    const tv = topView(m), p = tv.p;
+    const PW = 792, PH = 612, M = 36;
+    const availW = PW - 2*M - 80, availH = 150;
+    const div = [1,1.5,2,2.5,3,4,5,6].find(d => tv.maxX/d*MM2PT <= availW && 2*tv.maxHW/d*MM2PT <= availH) || 8;
+    const s = MM2PT/div;
+    const X0 = M + 40 + (availW - tv.maxX*s)/2;
+    const yC = PH - M - 58 - tv.maxHW*s;
+    const T = q => [X0 + q[0]*s, yC + q[1]*s];
+    const pg = pdfPage(), mm = v => v.toFixed(2);
+
+    pg.text(M, PH-M-8, name, 12, {bold:true});
+    pg.text(M, PH-M-22, `TOP VIEW DRAWING - nut on the left, treble edge at the top. Dimensions in mm. Drawn at 1:${div} - do not scale; use the numbers.`, 8, {gray:0.35});
+
+    // Board.
+    pg.stroke(0.4, 0.45); pg.dash(6,3);
+    pg.line(X0-10, yC, X0 + tv.maxX*s + 10, yC);
+    pg.stroke(1);
+    pg.poly(tv.outline.map(T), true);
+    pg.stroke(0.9); pg.poly(tv.nutLine.map(T));
+    const labels = [];
+    const halfLabel = k => String(k).length * 5.5 * 0.27;
+    tv.frets.forEach(fr=>{
+      pg.stroke(fr.k===tv.perpK ? 1.1 : 0.45);
+      pg.poly(fr.pts.map(T));
+      const b = T(fr.pts[0]), prev = labels[labels.length-1];
+      const clear = lab => !lab || b[0] - halfLabel(fr.k) >= lab.x + halfLabel(lab.k) + 2;
+      if(fr.k === p.numFrets) while(labels.length > 1 && !clear(labels[labels.length-1])) labels.pop();
+      if(clear(labels[labels.length-1]) || fr.k === p.numFrets) labels.push({k:fr.k, x:b[0], y:b[1]});
+    });
+    labels.forEach(lab=>pg.text(lab.x, lab.y-9, lab.k, 5.5, {align:'center'}));
+    const nb = T(tv.nutLine[0]);
+    pg.text(nb[0], nb[1]-9, 'NUT', 5.5, {align:'center', bold:true});
+    const edgeX = Math.min(T(tv.nutLine[0])[0], T(tv.nutLine[8])[0]) - 24;
+    pg.text(edgeX, yC + tv.maxHW*s + 4, 'TREBLE', 6, {gray:0.35, align:'right'});
+    pg.text(edgeX, yC - tv.maxHW*s - 9, 'BASS', 6, {gray:0.35, align:'right'});
+
+    // Dimensions.
+    pg.stroke(0.4);
+    const hdim = (a, b, yLine, label) => {
+      pg.line(a[0], a[1], a[0], yLine + (yLine>a[1] ? 3 : -3));
+      pg.line(b[0], b[1], b[0], yLine + (yLine>b[1] ? 3 : -3));
+      pg.line(a[0], yLine, b[0], yLine);
+      pg.arrow(a[0], yLine, -1, 0); pg.arrow(b[0], yLine, 1, 0);
+      pg.text((a[0]+b[0])/2, yLine + (yLine>yC ? 3 : -9), label, 7.5, {align:'center'});
+    };
+    const vdim = (a, b, xLine, label) => {
+      pg.line(a[0], a[1], xLine + (xLine>a[0] ? 3 : -3), a[1]);
+      pg.line(b[0], b[1], xLine + (xLine>b[0] ? 3 : -3), b[1]);
+      pg.line(xLine, a[1], xLine, b[1]);
+      pg.arrow(xLine, a[1], 0, -1); pg.arrow(xLine, b[1], 0, 1);
+      pg.text(xLine + (xLine>X0 ? 10 : -3), (a[1]+b[1])/2, label, 7.5, {rot:true, align:'center'});
+    };
+    const tN = T(tv.nutLine[8]), tH = T(tv.heelLine[8]), bN = T(tv.nutLine[0]), bH = T(tv.heelLine[0]);
+    const top = yC + tv.maxHW*s;
+    hdim(tN, tH, top + 18, (p.multiscale ? 'Treble edge length ' : 'Overall length ') + mm(tv.lenT));
+    if(p.multiscale) hdim(bN, bH, yC - tv.maxHW*s - 22, 'Bass edge length ' + mm(tv.lenB));
+    vdim(bN, tN, Math.min(bN[0], tN[0]) - 16, 'Nut ' + mm(p.nutWidth));
+    vdim(bH, tH, Math.max(bH[0], tH[0]) + 16, 'Heel ' + mm(p.heelWidth));
+
+    // Fret table: two column groups.
+    let ty = Math.min(yC - tv.maxHW*s - 44, 420);
+    pg.text(M, ty, 'FRET EDGE POSITIONS - mm from the nut, measured along each edge', 8, {bold:true});
+    ty -= 14;
+    const cols = p.multiscale ? [['Fret',0],['Treble',70],['Bass',125]] : [['Fret',0],['From nut',75]];
+    const gW = p.multiscale ? 165 : 115, rows = Math.ceil(p.numFrets/2);
+    for(let g=0; g<2; g++){
+      const gx = M + g*(gW+20);
+      cols.forEach(([h,dx])=>pg.text(gx+dx, ty, h, 7.5, {bold:true, align: dx ? 'right' : 'left'}));
+      pg.stroke(0.4); pg.line(gx, ty-3, gx + (p.multiscale ? 125 : 75), ty-3);
+      for(let r=0; r<rows; r++){
+        const fr = tv.frets[g*rows + r]; if(!fr) break;
+        const y = ty - 12 - r*10.5;
+        pg.text(gx, y, fr.k + (fr.k===tv.perpK ? ' (perp.)' : ''), 7.5);
+        pg.text(gx+cols[1][1], y, mm(fr.treble), 7.5, {align:'right'});
+        if(p.multiscale) pg.text(gx+cols[2][1], y, mm(fr.bass), 7.5, {align:'right'});
+      }
+    }
+
+    // Notes, above the title block.
+    const nx = PW - M - 250;
+    const notes = [
+      '1. Dimensions in mm. Do not scale this drawing.',
+      '2. Fret positions are measured from the nut along each edge.',
+      '3. Fret edge positions: +/-0.1 mm (critical for intonation).',
+      '4. Fret edge = top corner of each step. Keep sharp;',
+      '    break no more than 0.1 mm.',
+      '5. Other dimensions: ISO 2768-m.',
+      '6. Steps, heights and radius: see the STEP model.',
+    ];
+    let ny = Math.min(yC - tv.maxHW*s - 44, 420);
+    pg.text(nx, ny, 'NOTES', 8, {bold:true});
+    notes.forEach((t,i)=>pg.text(nx, ny - 13 - i*10.5, t, 7.5));
+
+    // Title block.
+    const tbH = 112;
+    pg.stroke(0.8); pg.rect(nx, M, 250, tbH);
+    pg.stroke(0.4); pg.line(nx, M + tbH - 20, nx + 250, M + tbH - 20);
+    pg.text(nx + 8, M + tbH - 14, 'Bond stepped fretboard - top view', 9, {bold:true});
+    pg.text(nx + 242, M + tbH - 14, todayDMY(), 8, {align:'right'});
+    topSpecLines(tv).forEach((t,i)=>pg.text(nx + 8, M + tbH - 34 - i*11, t, 7));
+    pg.text(nx + 8, M + 21, `3D model: ${name}.step`, 7);
+    pg.text(nx + 8, M + 10, `Drawing scale 1:${div} on Letter landscape   Material/finish: per order`, 7, {gray:0.35});
+
+    return buildPDF(PW, PH, pg.content, fileStem || name + '-top-drawing');
+  }
+
+  // True 1:1 top view split across Letter-landscape pages. Each later page
+  // overlaps the one before; cut it on its dashed line, lay it over the
+  // previous page and match the + marks.
+  function topTemplatePDF(m, name, fileStem){
+    name = name || 'bond-fretboard';
+    const tv = topView(m);
+    const PWmm = 279.4, PHmm = 215.9, MG = 10, W = PWmm - 2*MG;
+    const OVER = 16, STEP = W - OVER, START = 12;     // mm
+    const n = Math.max(1, Math.ceil((tv.maxX + 2 + START - W)/STEP) + 1);
+    const pages = [];
+    for(let i=0;i<n;i++){
+      const a = i*STEP - START;                        // board x at the left printable edge
+      const T = q => [(MG + q[0] - a)*MM2PT, (PHmm/2 + q[1])*MM2PT];
+      const pg = pdfPage();
+      pg.text(MG*MM2PT, (PHmm-MG)*MM2PT - 8, `${name} - TOP VIEW 1:1 TEMPLATE - PAGE ${i+1} OF ${n}`, 9, {bold:true});
+      pg.text(MG*MM2PT, (PHmm-MG)*MM2PT - 20, 'Print at 100% / Actual size, Letter landscape. Nut on the left, treble edge at the top.', 7.5, {gray:0.35});
+
+      pg.clip(MG*MM2PT, MG*MM2PT, W*MM2PT, (PHmm-2*MG)*MM2PT);
+      pg.stroke(0.3, 0.45); pg.dash(6,3);
+      pg.line(...T([-8, 0]), ...T([tv.maxX + 8, 0]));
+      pg.stroke(0.6); pg.poly(tv.outline.map(T), true);
+      pg.stroke(0.8); pg.poly(tv.nutLine.map(T));
+      tv.frets.forEach(fr=>{
+        pg.stroke(fr.k===tv.perpK ? 0.7 : 0.35);
+        pg.poly(fr.pts.map(T));
+        const b = T(fr.pts[0]);
+        pg.text(b[0], b[1] - 12, fr.k, 7, {align:'center'});
+      });
+      const nb = T(tv.nutLine[0]);
+      pg.text(nb[0], nb[1] - 12, 'NUT', 7, {align:'center', bold:true});
+      pg.text(...T([tv.frets[0].pts[8][0] / 2, tv.maxHW + 4]), 'TREBLE', 7, {gray:0.35, align:'center'});
+
+      // Registration marks shared with the previous page, plus its cut line.
+      const regs = [];
+      if(i > 0) regs.push(a + OVER*0.75);
+      if(i < n-1) regs.push(a + STEP + OVER*0.75);
+      pg.stroke(0.5);
+      regs.forEach(rx=>[tv.maxHW + 14, -tv.maxHW - 20].forEach(ry=>{
+        const [X,Y] = T([rx, ry]);
+        pg.line(X-12, Y, X+12, Y); pg.line(X, Y-12, X, Y+12);
+      }));
+      pg.unclip();
+      if(i > 0){
+        const X = (MG + OVER/2)*MM2PT;
+        pg.stroke(0.5); pg.dash(4,3);
+        pg.line(X, MG*MM2PT, X, (PHmm-MG)*MM2PT - 26);
+        pg.text(X + 4, MG*MM2PT + 4, `CUT HERE, lay over page ${i} and match the + marks`, 7, {gray:0.35});
+      }
+      if(i === 0){
+        // Print-scale check.
+        const x0 = (MG + 4)*MM2PT, y0 = (MG + 6)*MM2PT;
+        pg.stroke(0.8);
+        pg.line(x0, y0, x0 + 50*MM2PT, y0);
+        pg.line(x0, y0-3, x0, y0+3); pg.line(x0 + 50*MM2PT, y0-3, x0 + 50*MM2PT, y0+3);
+        pg.text(x0 + 50*MM2PT + 6, y0 - 2.5, '50 mm', 7);
+        pg.line(x0, y0 + 14, x0 + 2*72, y0 + 14);
+        pg.line(x0, y0+11, x0, y0+17); pg.line(x0 + 144, y0+11, x0 + 144, y0+17);
+        pg.text(x0 + 144 + 6, y0 + 11.5, '2 in   - measure both before using this template', 7);
+      }
+      pages.push(pg.content);
+    }
+    return {pdf: buildPDF(PWmm*MM2PT, PHmm*MM2PT, pages, fileStem || name + '-top-template-1to1'), pages:n};
   }
 
   // ================================================================
@@ -1973,15 +2234,15 @@
     $('statusbar').classList.toggle('bad', !!bad);
     $('statusText').innerHTML = html;
   }
-  function baseName(m){
+  // Every export: bond-fretboard-<scale>-<frets>f-<radius>[-reversed][-<kind>]-<day-month-year>
+  function baseName(m, kind){
     const p = m.params;
     const sc = p.multiscale ? `${p.trebleScale.toFixed(0)}-${p.bassScale.toFixed(0)}mm` : `${p.trebleScale.toFixed(0)}mm`;
     // Radius in inches (how luthiers quote it), e.g. 12in-radius, 9.5in-radius.
     const rad = p.radiused ? `${trimNum(p.boardRadius/MM_PER_IN, 2)}in-radius` : 'flat';
-    const d = new Date(), two = v => String(v).padStart(2,'0');
-    const date = `${two(d.getDate())}-${two(d.getMonth()+1)}-${d.getFullYear()}`;   // day-month-year
+    const date = todayDMY();   // day-month-year
     const dir = p.stepDir === 'falling' ? '-reversed' : '';
-    return `bond-fretboard-${sc}-${p.numFrets}f-${rad}${dir}-${date}`;
+    return `bond-fretboard-${sc}-${p.numFrets}f-${rad}${dir}${kind ? '-'+kind : ''}-${date}`;
   }
 
   document.addEventListener('click', e=>{
@@ -1990,13 +2251,20 @@
     const kind = btn.dataset.export;
     const m = currentModel, b = baseName(m);
     let file = null;
-    if(kind==='profile-svg'){ file = b+'-profile.svg'; download(file, edgeSVGString(m.treble, m, 'Side profile', '#0a8f8c'), 'image/svg+xml'); }
-    else if(kind==='svg-treble'){ file = b+'-TREBLE.svg'; download(file, edgeSVGString(m.treble, m, 'TREBLE edge', '#0a8f8c'), 'image/svg+xml'); }
-    else if(kind==='svg-bass'){ file = b+'-BASS.svg'; download(file, edgeSVGString(m.bass, m, 'BASS edge', '#b3791f'), 'image/svg+xml'); }
-    else if(kind==='profile-dxf'){ file = b+'-profile.dxf'; download(file, edgeDXFString(m.treble, m, 'PROFILE'), 'application/dxf'); }
-    else if(kind==='dxf-treble'){ file = b+'-TREBLE.dxf'; download(file, edgeDXFString(m.treble, m, 'PROFILE_TREBLE'), 'application/dxf'); }
-    else if(kind==='dxf-bass'){ file = b+'-BASS.dxf'; download(file, edgeDXFString(m.bass, m, 'PROFILE_BASS'), 'application/dxf'); }
-    else if(kind==='profile-pdf'){ file = b+'-profile-1to1.pdf'; download(file, profilePDF(m), 'application/pdf'); }
+    if(kind==='profile-svg'){ file = baseName(m,'profile')+'.svg'; download(file, edgeSVGString(m.treble, m, 'Side profile', '#0a8f8c'), 'image/svg+xml'); }
+    else if(kind==='svg-treble'){ file = baseName(m,'TREBLE')+'.svg'; download(file, edgeSVGString(m.treble, m, 'TREBLE edge', '#0a8f8c'), 'image/svg+xml'); }
+    else if(kind==='svg-bass'){ file = baseName(m,'BASS')+'.svg'; download(file, edgeSVGString(m.bass, m, 'BASS edge', '#b3791f'), 'image/svg+xml'); }
+    else if(kind==='profile-dxf'){ file = baseName(m,'profile')+'.dxf'; download(file, edgeDXFString(m.treble, m, 'PROFILE'), 'application/dxf'); }
+    else if(kind==='dxf-treble'){ file = baseName(m,'TREBLE')+'.dxf'; download(file, edgeDXFString(m.treble, m, 'PROFILE_TREBLE'), 'application/dxf'); }
+    else if(kind==='dxf-bass'){ file = baseName(m,'BASS')+'.dxf'; download(file, edgeDXFString(m.bass, m, 'PROFILE_BASS'), 'application/dxf'); }
+    else if(kind==='profile-pdf'){ file = baseName(m,'profile-1to1')+'.pdf'; download(file, profilePDF(m, b, file.slice(0,-4)), 'application/pdf'); }
+    else if(kind==='top-drawing'){ file = baseName(m,'top-drawing')+'.pdf'; download(file, topDrawingPDF(m, b, file.slice(0,-4)), 'application/pdf'); }
+    else if(kind==='top-template'){
+      file = baseName(m,'top-template-1to1')+'.pdf';
+      const t = topTemplatePDF(m, b, file.slice(0,-4));
+      download(file, t.pdf, 'application/pdf');
+      setStatus('Top-view template written: <b>'+t.pages+'</b> Letter landscape pages at true 1:1. Print at 100% (Actual size), check the 50 mm and 2 in bars on page 1, then cut each later page on its dashed line and match the + marks.', false);
+    }
     else if(kind==='step'){ exportSTEP(m, b+'.step'); return; }
     else if(kind==='stl'){
       file = b+'.stl';
