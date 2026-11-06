@@ -216,9 +216,6 @@
   .tabs button{border:0; background:none; color:var(--ink-2); font-size:13px; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer; display:inline-flex; gap:7px; align-items:center;}
   .tabs button[aria-selected="true"]{background:var(--panel); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.2);}
   .viewer-tools{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
-  .exag{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-3);}
-  .exag input{width:110px;}
-  .exag b{font-family:var(--mono); color:var(--ink-2); font-weight:600; min-width:28px;}
   .pill-btn{
     border:1px solid var(--line); background:var(--panel-2); color:var(--ink-2);
     font-size:12px; font-weight:600; padding:6px 11px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
@@ -479,9 +476,6 @@
           </button>
         </div>
         <div class="viewer-tools">
-          <label class="exag" id="exagCtl" title="Preview only — exported files are always true scale">
-            Height ×<input type="range" id="exag" min="1" max="12" step="1" value="4"><b id="exagVal">4×</b>
-          </label>
           <button class="pill-btn" id="spinBtn" aria-pressed="true" title="Auto-rotate">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Spin
           </button>
@@ -625,7 +619,7 @@
 
   const DEFAULT_STATE = () => ({
     unit:'mm', scaleType:'single', radiusMode:'flat', perpChoice:'nut', stepDir:'rising',
-    wood:'phenolic', exag:4, spin:true, view:'3d',
+    wood:'phenolic', spin:true, view:'3d',
     vals: Object.fromEntries(Object.entries(SPECS).map(([k,s])=>[k,s.def])),
   });
   const STORE_KEY = 'stepboard.v1';
@@ -1740,7 +1734,6 @@
     $('singleScaleField').classList.toggle('hidden', S.scaleType!=='single');
     $('multiScaleFields').classList.toggle('hidden', S.scaleType!=='multi');
     $('radiusFields').classList.toggle('hidden', S.radiusMode!=='curved');
-    $('exag').value = S.exag; $('exagVal').textContent = S.exag+'×'; paintRange($('exag'));
     $('spinBtn').setAttribute('aria-pressed', String(!!S.spin));
     setView(S.view, true);
   }
@@ -1983,12 +1976,14 @@
     if(text != null) el.textContent = text;
     return el;
   }
+  // The side profile is ~6 mm tall over ~500 mm, so it is drawn taller to be readable.
+  const PROFILE_EXAG = 4;
   let profileMap = null;
   function renderProfile(model){
     const svg = $('profileSVG');
     const pane = $('profilePane');
     const W = Math.max(300, pane.clientWidth - 36);
-    const E = S.exag;
+    const E = PROFILE_EXAG;
     const edges = model.multiscale ? [model.bass, model.treble] : [model.treble];
     const all = [].concat(...edges.map(e=>e.polygon));
     const minX = Math.min(...all.map(p=>p.x)), maxX = Math.max(...all.map(p=>p.x));
@@ -2053,7 +2048,7 @@
     const p = model.params;
     $('legend').innerHTML = model.multiscale
       ? `<span><i style="background:${teal}"></i>Treble edge · ${L(p.trebleScale,1)}</span><span><i style="background:${accent}"></i>Bass edge · ${L(p.bassScale,1)}</span>`
-      : `<span><i style="background:${teal}"></i>Side profile · ${L(p.trebleScale,1)} scale</span><span style="color:var(--ink-3)">Height shown ${S.exag}× · ${p.numFrets} steps</span>`;
+      : `<span><i style="background:${teal}"></i>Side profile · ${L(p.trebleScale,1)} scale</span><span style="color:var(--ink-3)">Height shown ${PROFILE_EXAG}× · ${p.numFrets} steps</span>`;
   }
 
   function profileHover(e){
@@ -2130,15 +2125,14 @@
   }
   function update3D(model){
     if(!G3.ok) return;
-    const E = S.exag;
     const tris = model.tris;
-    // CAD (x length, y width, z up)  ->  three (x, z*E, -y): a pure rotation, keeps winding.
+    // CAD (x length, y width, z up)  ->  three (x, z, -y): a pure rotation at true scale, keeps winding.
     let minX=Infinity, maxX=-Infinity;
     tris.forEach(t=>t.forEach(v=>{ if(v.x<minX)minX=v.x; if(v.x>maxX)maxX=v.x; }));
     const cx = (minX+maxX)/2;
     const pos = new Float32Array(tris.length*9);
     let i = 0;
-    tris.forEach(t=>t.forEach(v=>{ pos[i++] = v.x - cx; pos[i++] = v.z*E; pos[i++] = -v.y; }));
+    tris.forEach(t=>t.forEach(v=>{ pos[i++] = v.x - cx; pos[i++] = v.z; pos[i++] = -v.y; }));
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.computeVertexNormals();
@@ -2154,7 +2148,7 @@
     const len = maxX - minX;
     if(Math.abs(len - G3.size) > len*0.25 || !G3.fitted){ G3.size = len; fit3D(); G3.fitted = true; }
     G3.size = len;
-    $('glBadge').textContent = model.tris.length.toLocaleString()+' facets · height '+E+'×';
+    $('glBadge').textContent = model.tris.length.toLocaleString()+' facets · true scale';
     G3.dirty = true;
   }
   function fit3D(){
@@ -2220,7 +2214,6 @@
     $('glPane').classList.toggle('hidden', v!=='3d');
     $('profilePane').classList.toggle('hidden', v!=='profile');
     $('tablePane').classList.toggle('hidden', v!=='table');
-    $('exagCtl').classList.toggle('hidden', v==='table');
     $('spinBtn').classList.toggle('hidden', v!=='3d');
     $('viewResetBtn').classList.toggle('hidden', v!=='3d');
     if(v==='profile' && currentModel) renderProfile(currentModel);
@@ -2359,7 +2352,6 @@
   $('perpFret').addEventListener('change', e=>{ S.perpChoice = e.target.value; rebuild(); });
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click', ()=>$(b.dataset.help).classList.toggle('hidden')));
-  $('exag').addEventListener('input', e=>{ S.exag = parseInt(e.target.value); $('exagVal').textContent = S.exag+'×'; paintRange(e.target); schedule(); });
   $('spinBtn').addEventListener('click', ()=>{ S.spin = !S.spin; $('spinBtn').setAttribute('aria-pressed', String(S.spin)); save(); });
   $('viewResetBtn').addEventListener('click', fit3D);
   $('csvBtn').addEventListener('click', ()=>{ if(!currentModel) return; const f = baseName(currentModel)+'-frets.csv'; download(f, fretCSV(currentModel), 'text/csv'); toast('Saved '+f); });
