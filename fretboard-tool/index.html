@@ -402,12 +402,19 @@
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto"><path d="M6 9l6 6 6-6"/></svg>
       </summary>
       <div class="sec-body">
+        <div class="seg full" role="group" aria-label="Step direction">
+          <button data-stepdir="rising" aria-pressed="true" title="Original Bond Electraglide: each step climbs to the fret edge">Ramp up · Bond</button>
+          <button data-stepdir="falling" aria-pressed="false" title="Reversed: each step falls away from the fret edge">Ramp down</button>
+        </div>
         <div class="step-diagram" id="stepRead" aria-label="Diagram of one step"></div>
         <div class="ctl" data-key="fullHeight"></div>
         <div class="ctl" data-key="fretHeight"></div>
         <button class="help-toggle" data-help="helpStep">ⓘ How the steps are shaped</button>
         <div class="help hidden" id="helpStep">
-          At every fret position the board has a <b>square edge</b> that stands up by the <b>step height</b> — that edge does the job of a fret, and it's what the string presses against. Behind each edge the surface ramps straight down to the next fret. <b>Full height</b> is the board at its thickest (the top of any step), measured from the flat back. The <b>thinnest point</b> is the bottom of each ramp, right before the next edge: full height minus step height. Most boards land around 5–6&nbsp;mm full height. The area between the nut and fret 1 is flat at the thinnest height.
+          At every fret position the board has a <b>square edge</b> that stands up by the <b>step height</b> — that edge does the job of a fret, and it's what the string presses against.
+          <b>Ramp up</b> is the original Bond Electraglide: from the nut, the surface starts low and climbs to the top of fret 1, drops straight down, then climbs again to fret 2, and so on. The last fret ends at full height and drops to the heel.
+          <b>Ramp down</b> is the reverse: each edge stands up on the bridge side and the surface ramps down toward the next fret, with a flat run from the nut to fret 1.
+          <b>Full height</b> is the board at its thickest (the top of any step), measured from the flat back. The <b>thinnest point</b> is the bottom of each ramp: full height minus step height. Most boards land around 5–6&nbsp;mm full height.
         </div>
       </div>
     </details>
@@ -607,7 +614,7 @@
   ];
 
   const DEFAULT_STATE = () => ({
-    unit:'mm', scaleType:'single', radiusMode:'flat', perpChoice:'nut',
+    unit:'mm', scaleType:'single', radiusMode:'flat', perpChoice:'nut', stepDir:'rising',
     wood:'phenolic', exag:4, spin:true, view:'3d',
     vals: Object.fromEntries(Object.entries(SPECS).map(([k,s])=>[k,s.def])),
   });
@@ -666,13 +673,17 @@
   }
 
   // sawtooth: constant trough (baseThickness) / constant peak (baseThickness+fretHeight)
-  function buildSawtoothProfile(scaleLen, numFrets, baseThickness, fretHeight, overhang){
+  //   'rising'  (Bond original): ramp up from the nut to each fret's peak, then
+  //             drop straight down on the bridge side of the edge.
+  //   'falling' (reversed): flat nut -> fret 1, then at each fret the edge
+  //             stands up on the bridge side and the ramp falls to the next fret.
+  function buildSawtoothProfile(scaleLen, numFrets, baseThickness, fretHeight, overhang, stepDir){
     const x = fretPositions(scaleLen, numFrets);
     const trough = baseThickness, peak = baseThickness + fretHeight;
     const pts = [{x:0, z:trough, fret:0, kind:'nut'}];
     for(let k=1;k<=numFrets;k++){
-      pts.push({x:x[k], z:trough, fret:k, kind:'base'});
-      pts.push({x:x[k], z:peak,   fret:k, kind:'peak'});
+      const base = {x:x[k], z:trough, fret:k, kind:'base'}, top = {x:x[k], z:peak, fret:k, kind:'peak'};
+      if(stepDir === 'falling') pts.push(base, top); else pts.push(top, base);
     }
     pts.push({x:x[numFrets]+overhang, z:trough, fret:numFrets+1, kind:'heel'});
     return {profile: pts, fretX: x};
@@ -685,7 +696,7 @@
 
   // Build one edge, shifted along x by `shift` so the perpendicular fret aligns.
   function edgeModel(scaleLen, p, shift){
-    const {profile, fretX} = buildSawtoothProfile(scaleLen, p.numFrets, p.baseThickness, p.fretHeight, p.overhang);
+    const {profile, fretX} = buildSawtoothProfile(scaleLen, p.numFrets, p.baseThickness, p.fretHeight, p.overhang, p.stepDir);
     const sProfile = profile.map(pt=>({x:pt.x+shift, z:pt.z, fret:pt.fret, kind:pt.kind}));
     const polygon = closedPolygon(sProfile);
     const totalLength = fretX[p.numFrets] + p.overhang;
@@ -791,6 +802,7 @@
       thinClamped: fullHeight - fretHeight < 0.5,
       nutWidth:      Math.max(0.1,  num(v.nutWidth, 43)),
       heelWidth:     Math.max(0.1,  num(v.heelWidth, 57)),
+      stepDir: S.stepDir === 'falling' ? 'falling' : 'rising',
       radiused: (S.radiusMode === 'curved'),
       boardRadius: Math.max(MIN_RADIUS_MM, num(v.boardRadius, 304.8)),
       radiusClamped: num(v.boardRadius, 304.8) < MIN_RADIUS_MM - 1e-6,
@@ -1446,6 +1458,7 @@
     setPressed('unit', S.unit);
     setPressed('scaletype', S.scaleType);
     setPressed('radius', S.radiusMode);
+    setPressed('stepdir', S.stepDir);
     $('singleScaleField').classList.toggle('hidden', S.scaleType!=='single');
     $('multiScaleFields').classList.toggle('hidden', S.scaleType!=='multi');
     $('radiusFields').classList.toggle('hidden', S.radiusMode!=='curved');
@@ -1557,12 +1570,17 @@
     const p = m.params;
     const full = p.baseThickness + p.fretHeight;
     const thinWarn = p.thinClamped || p.baseThickness < 2;
-    // Schematic (not to scale) of two steps with live dimensions.
+    // Schematic (not to scale) of two steps with live dimensions. Edges sit at
+    // x=140 and x=225 either way; only the ramps between them flip.
+    const rising = p.stepDir !== 'falling';
+    const outline = rising ? '100,100 100,52 140,40 140,64 225,40 225,64 310,40 310,100'
+                           : '100,100 100,64 140,64 140,40 225,64 225,40 310,64 310,100';
+    const thinX = rising ? 146 : 120, thinTextX = rising ? 154 : 128;
     $('stepRead').innerHTML = `
       <svg viewBox="0 0 320 122" role="img" aria-label="Full height ${L(full)}, step height ${L(p.fretHeight)}, thinnest point ${L(p.baseThickness)}">
         <defs><marker id="ah" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M0 0L8 4L0 8z" fill="var(--ink-2)"/></marker></defs>
-        <polygon points="100,100 100,64 140,64 140,40 225,64 225,40 310,64 310,100"
+        <polygon points="${outline}"
           fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>
         <g stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="2 2">
           <line x1="140" y1="40" x2="80" y2="40"/><line x1="100" y1="100" x2="80" y2="100"/>
@@ -1571,7 +1589,7 @@
         <g stroke="var(--ink-2)" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)">
           <line x1="86" y1="43" x2="86" y2="97"/>
           <line x1="210" y1="43" x2="210" y2="61"/>
-          <line x1="120" y1="67" x2="120" y2="97"/>
+          <line x1="${thinX}" y1="67" x2="${thinX}" y2="97"/>
         </g>
         <g font-family="Space Grotesk, sans-serif" font-size="11">
           <text x="76" y="64" text-anchor="end" fill="var(--ink-2)">Full</text>
@@ -1579,8 +1597,8 @@
           <text x="76" y="92" text-anchor="end" fill="var(--accent)" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(full)}</text>
           <text x="225" y="16" text-anchor="middle" fill="var(--ink-2)">Step height</text>
           <text x="225" y="30" text-anchor="middle" fill="var(--accent)" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(p.fretHeight)}</text>
-          <text x="128" y="84" fill="var(--ink-2)">Thinnest point</text>
-          <text x="128" y="96" fill="${thinWarn ? 'var(--rose)' : 'var(--accent)'}" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(p.baseThickness)} ${S.unit}</text>
+          <text x="${thinTextX}" y="84" fill="var(--ink-2)">Thinnest point</text>
+          <text x="${thinTextX}" y="96" fill="${thinWarn ? 'var(--rose)' : 'var(--accent)'}" font-family="JetBrains Mono, monospace" font-weight="700">${Lnum(p.baseThickness)} ${S.unit}</text>
           <text x="140" y="116" text-anchor="middle" fill="var(--ink-3)" font-size="10">fret edge</text>
           <text x="310" y="116" text-anchor="end" fill="var(--ink-3)" font-size="10">toward bridge →</text>
         </g>
@@ -1962,7 +1980,8 @@
     const rad = p.radiused ? `${trimNum(p.boardRadius/MM_PER_IN, 2)}in-radius` : 'flat';
     const d = new Date(), two = v => String(v).padStart(2,'0');
     const date = `${two(d.getDate())}-${two(d.getMonth()+1)}-${d.getFullYear()}`;   // day-month-year
-    return `bond-fretboard-${sc}-${p.numFrets}f-${rad}-${date}`;
+    const dir = p.stepDir === 'falling' ? '-reversed' : '';
+    return `bond-fretboard-${sc}-${p.numFrets}f-${rad}${dir}-${date}`;
   }
 
   document.addEventListener('click', e=>{
@@ -2048,6 +2067,9 @@
   }));
   document.querySelectorAll('[data-radius]').forEach(b=>b.addEventListener('click', ()=>{
     S.radiusMode = b.dataset.radius; syncModes(); rebuild();
+  }));
+  document.querySelectorAll('[data-stepdir]').forEach(b=>b.addEventListener('click', ()=>{
+    S.stepDir = b.dataset.stepdir; syncModes(); rebuild();
   }));
   $('perpFret').addEventListener('change', e=>{ S.perpChoice = e.target.value; rebuild(); });
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
