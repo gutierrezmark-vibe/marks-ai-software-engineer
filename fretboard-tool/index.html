@@ -419,16 +419,21 @@
     <details class="sec card" open>
       <summary>
         <span class="sec-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 9l18-3v12L3 15z"/></svg></span>
-        Board taper <span class="sec-sub">STEP · STL</span>
+        Width &amp; strings <span class="sec-sub">STEP · STL</span>
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </summary>
       <div class="sec-body">
         <div class="ctl" data-key="numStrings"></div>
         <div class="ctl" data-key="nutWidth"></div>
         <div class="ctl" data-key="heelWidth"></div>
-        <button class="help-toggle" data-help="helpTaper">ⓘ About the taper</button>
+        <div class="ctl" data-key="eeNut"></div>
+        <div class="ctl" data-key="eeBridge"></div>
+        <div class="mini-read" id="stringRead"></div>
+        <div id="stringAlert"></div>
+        <button class="help-toggle" data-help="helpTaper">ⓘ About width &amp; strings</button>
         <div class="help hidden" id="helpTaper">
-          <b>Number of strings</b> sets typical nut and heel widths for that many strings (6: 43/57, 7: 48/66, 8: 56/74, 9: 63/82&nbsp;mm); adjust either width afterwards to match your string spacing. Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel with single scale for a plain parallel extrusion.
+          <b>Number of strings</b> sets typical nut and heel widths for that many strings (6: 43/57, 7: 48/66, 8: 56/74, 9: 63/82&nbsp;mm); adjust either width afterwards to match your string spacing. Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel with single scale for a plain parallel extrusion.<br><br>
+          <b>String spacing</b> is centre-to-centre from the lowest to the highest string (E to E on a 6-string), at the nut and at the bridge. Strings are spaced evenly and centred on the board's centre line; on multiscale boards each string's length is interpolated between the bass and treble scales. They're a visual check only and don't change the exported solid. The readout shows the wood left outside the outer strings at the nut and at the last fret; builders usually want at least 3&nbsp;mm so strings don't slip off the edge.
         </div>
       </div>
     </details>
@@ -476,6 +481,9 @@
           </button>
         </div>
         <div class="viewer-tools">
+          <button class="pill-btn" id="stringsBtn" aria-pressed="true" title="Show mock strings">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M3 10h18M3 14h18M3 18h18"/></svg>Strings
+          </button>
           <button class="pill-btn" id="spinBtn" aria-pressed="true" title="Auto-rotate">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Spin
           </button>
@@ -569,6 +577,8 @@
   const MIN_RADIUS_MM = 7.25 * MM_PER_IN; // 184.15
   // Typical production nut / last-fret widths (mm) by string count; approximate.
   const STRING_WIDTHS = {6:[43,57], 7:[48,66], 8:[56,74], 9:[63,82]};
+  // Typical outer-string spacing (mm, centre to centre) at the nut and at the bridge.
+  const STRING_SPREAD = {6:[35,52], 7:[41,63], 8:[48,73.5], 9:[55,80]};
   function $(id){ return document.getElementById(id); }
 
   // ================================================================
@@ -587,6 +597,9 @@
     numStrings:    {label:'Number of strings',     len:false,def:6,      min:6,   max:9,   step:1,
                     hint:'Sets typical nut and heel widths — fine-tune them below', onChange:applyStringWidths},
     nutWidth:      {label:'Nut width',             len:true, def:43,     min:20,  max:90,  step:0.1},
+    eeNut:         {label:'String spacing at nut',  len:true, def:35,     min:15,  max:85,  step:0.1,
+                    hint:'Lowest to highest string, centre to centre (E to E)'},
+    eeBridge:      {label:'String spacing at bridge', len:true, def:52,   min:20,  max:110, step:0.1},
     heelWidth:     {label:'Heel width',            len:true, def:57,     min:20,  max:110, step:0.1},
     boardRadius:   {label:'Radius',                len:true, def:304.8,  min:MIN_RADIUS_MM, max:1000, step:0.1},
     arcFacets:     {label:'Arc facets (smoothness)', len:false, def:24,  min:4,   max:96,  step:1},
@@ -621,27 +634,13 @@
   const DEFAULT_STATE = () => ({
     // First launch = Mark's Gibson Drop D board (same values as that preset).
     unit:'mm', scaleType:'multi', radiusMode:'curved', perpChoice:'9', stepDir:'rising',
-    wood:'phenolic', spin:true, view:'3d',
+    wood:'phenolic', spin:true, showStrings:true, view:'3d',
     vals: Object.fromEntries(Object.entries(SPECS).map(([k,s])=>[k,s.def])),
   });
-  const STORE_KEY = 'stepboard.v1';
+  // Every visit opens on the defaults above (3D view, spinning); board settings
+  // are deliberately not remembered between visits. Clear what older versions saved.
   let S = DEFAULT_STATE();
-  try{
-    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if(saved && saved.vals){
-      S = Object.assign(DEFAULT_STATE(), saved);
-      // Older saves stored the thinnest point; convert to full height.
-      if(saved.vals.fullHeight == null && saved.vals.baseThickness != null)
-        saved.vals.fullHeight = saved.vals.baseThickness + (saved.vals.fretHeight || 1);
-      delete saved.vals.baseThickness;
-      // Saves from before the strings control: pick the count whose typical nut width is closest.
-      if(saved.vals.numStrings == null && saved.vals.nutWidth != null)
-        saved.vals.numStrings = +Object.keys(STRING_WIDTHS).reduce((a,b)=>
-          Math.abs(STRING_WIDTHS[b][0]-saved.vals.nutWidth) < Math.abs(STRING_WIDTHS[a][0]-saved.vals.nutWidth) ? b : a);
-      S.vals = Object.assign(DEFAULT_STATE().vals, saved.vals);
-    }
-  }catch(e){}
-  function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+  try{ localStorage.removeItem('stepboard.v1'); }catch(e){}
   let theme = 'dark';
   try{ theme = localStorage.getItem('stepboard.theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }catch(e){}
   document.documentElement.dataset.theme = theme;
@@ -804,6 +803,7 @@
     return {
       multiscale, numFrets,
       numStrings: Math.min(9, Math.max(6, Math.round(num(v.numStrings, 6)))),
+      eeNut: Math.max(1, num(v.eeNut, 35)), eeBridge: Math.max(1, num(v.eeBridge, 52)),
       perpChoice: multiscale ? (S.perpChoice || 'nut') : 'nut',
       trebleScale: tC.value, bassScale: bC.value,
       trebleClamped: tC.clamped, bassClamped: bC.clamped,
@@ -1011,6 +1011,51 @@
       lenT: lastT - tb.fretX[0], lenB: lastB - bs.fretX[0],
     };
   }
+  // Mock strings in plan view (x along the board, y across, +y = treble).
+  // String 0 is the lowest (bass edge side). Each string starts on the nut line
+  // at its share of the nut spacing and runs straight to the bridge, placed so
+  // the string is exactly its scale long (scales interpolate bass -> treble).
+  function stringLayout(m){
+    const tv = topView(m), p = tv.p, n = p.numStrings, halfW = boardHalfWidth(m);
+    const hit = (a, b, poly) => {           // first crossing of segment a->b with a polyline
+      for(let k=0;k<poly.length-1;k++){
+        const c = poly[k], d = poly[k+1];
+        const r = [b[0]-a[0], b[1]-a[1]], q = [d[0]-c[0], d[1]-c[1]];
+        const den = r[0]*q[1] - r[1]*q[0]; if(Math.abs(den) < 1e-12) continue;
+        const t = ((c[0]-a[0])*q[1] - (c[1]-a[1])*q[0]) / den, u = ((c[0]-a[0])*r[1] - (c[1]-a[1])*r[0]) / den;
+        if(u >= -1e-9 && u <= 1+1e-9) return [a[0]+r[0]*t, a[1]+r[1]*t, t];
+      }
+      return null;
+    };
+    const onNut = y => {                    // point on the nut line at lateral y
+      const L = tv.nutLine;
+      for(let k=0;k<L.length-1;k++){
+        const a = L[k], b = L[k+1];
+        if((y - a[1])*(y - b[1]) <= 0){ const t = (y - a[1])/((b[1]-a[1]) || 1); return [a[0] + (b[0]-a[0])*t, y]; }
+      }
+      return [y < 0 ? L[0][0] : L[L.length-1][0], y];
+    };
+    const lastFret = tv.frets[tv.frets.length-1].pts;
+    const strings = [];
+    for(let i=0;i<n;i++){
+      const g = n > 1 ? i/(n-1) : 0.5;
+      const nut = onNut(-p.eeNut/2 + p.eeNut*g);
+      const scale = p.bassScale + (p.trebleScale - p.bassScale)*g;
+      const yb = -p.eeBridge/2 + p.eeBridge*g;
+      const bridge = [nut[0] + Math.sqrt(Math.max(0, scale*scale - (yb - nut[1])**2)), yb];
+      const heel = hit(nut, bridge, tv.heelLine) || bridge;
+      const fret = hit(nut, bridge, lastFret) || heel;
+      strings.push({i, g, scale, nut, bridge, heel:[heel[0],heel[1]], lastFret:[fret[0],fret[1]]});
+    }
+    // Wood outside the outer strings, measured across the board.
+    const lo = strings[0], hi = strings[n-1];
+    const margins = {
+      nut:  {bass: halfW(lo.nut[0]) + lo.nut[1],           treble: halfW(hi.nut[0]) - hi.nut[1]},
+      last: {bass: halfW(lo.lastFret[0]) + lo.lastFret[1], treble: halfW(hi.lastFret[0]) - hi.lastFret[1]},
+    };
+    return {strings, margins};
+  }
+
   function todayDMY(){
     const d = new Date(), two = v => String(v).padStart(2,'0');
     return `${two(d.getDate())}-${two(d.getMonth()+1)}-${d.getFullYear()}`;
@@ -1064,6 +1109,11 @@
     labels.forEach(lab=>pg.text(lab.x, lab.y-9, lab.k, 5.5, {align:'center'}));
     const nb = T(tv.nutLine[0]);
     pg.text(nb[0], nb[1]-9, 'NUT', 5.5, {align:'center', bold:true});
+    // Mock strings, nut to heel end.
+    const sl = stringLayout(m);
+    pg.stroke(0.35, 0.55);
+    sl.strings.forEach(st=>pg.line(...T(st.nut), ...T(st.heel)));
+    pg.stroke(0.4);
     const edgeX = Math.min(T(tv.nutLine[0])[0], T(tv.nutLine[8])[0]) - 24;
     pg.text(edgeX, yC + tv.maxHW*s + 4, 'TREBLE', 6, {gray:0.35, align:'right'});
     pg.text(edgeX, yC - tv.maxHW*s - 9, 'BASS', 6, {gray:0.35, align:'right'});
@@ -1126,12 +1176,14 @@
     notes.forEach((t,i)=>pg.text(nx, ny - 13 - i*10.5, t, 7.5));
 
     // Title block.
-    const tbH = 112;
+    const tbH = 124;
     pg.stroke(0.8); pg.rect(nx, M, 250, tbH);
     pg.stroke(0.4); pg.line(nx, M + tbH - 20, nx + 250, M + tbH - 20);
     pg.text(nx + 8, M + tbH - 14, 'Bond stepped fretboard - top view', 9, {bold:true});
     pg.text(nx + 242, M + tbH - 14, todayDMY(), 8, {align:'right'});
     topSpecLines(tv).forEach((t,i)=>pg.text(nx + 8, M + tbH - 34 - i*11, t, 7));
+    const mg = sl.margins;
+    pg.text(nx + 8, M + 32, `Strings (grey) E-E: ${mm(p.eeNut)} nut / ${mm(p.eeBridge)} bridge. Edge at last fret: ${mm(mg.last.bass)} / ${mm(mg.last.treble)}`, 6);
     pg.text(nx + 8, M + 21, `3D model: ${name}.step`, 7);
     pg.text(nx + 8, M + 10, `Drawing scale 1:${div} on Letter landscape   Material/finish: per order`, 7, {gray:0.35});
 
@@ -1147,6 +1199,7 @@
     const PWmm = 279.4, PHmm = 215.9, MG = 10, W = PWmm - 2*MG;
     const OVER = 16, STEP = W - OVER, START = 12;     // mm
     const n = Math.max(1, Math.ceil((tv.maxX + 2 + START - W)/STEP) + 1);
+    const strings = stringLayout(m).strings;
     const pages = [];
     for(let i=0;i<n;i++){
       const a = i*STEP - START;                        // board x at the left printable edge
@@ -1168,6 +1221,9 @@
       });
       const nb = T(tv.nutLine[0]);
       pg.text(nb[0], nb[1] - 12, 'NUT', 7, {align:'center', bold:true});
+      pg.stroke(0.3, 0.55); pg.dash(3, 2);
+      strings.forEach(st=>pg.line(...T(st.nut), ...T(st.heel)));
+      pg.stroke(0.5);
       pg.text(...T([tv.frets[0].pts[8][0] / 2, tv.maxHW + 4]), 'TREBLE', 7, {gray:0.35, align:'center'});
 
       // Registration marks shared with the previous page, plus its cut line.
@@ -1683,7 +1739,8 @@
   function applyStringWidths(){
     const n = Math.min(9, Math.max(6, Math.round(S.vals.numStrings || 6)));
     [S.vals.nutWidth, S.vals.heelWidth] = STRING_WIDTHS[n];
-    syncControl('nutWidth'); syncControl('heelWidth');
+    [S.vals.eeNut, S.vals.eeBridge] = STRING_SPREAD[n];
+    ['nutWidth','heelWidth','eeNut','eeBridge'].forEach(syncControl);
   }
   function buildControls(){
     document.querySelectorAll('.ctl[data-key]').forEach(el=>{
@@ -1744,6 +1801,7 @@
     $('multiScaleFields').classList.toggle('hidden', S.scaleType!=='multi');
     $('radiusFields').classList.toggle('hidden', S.radiusMode!=='curved');
     $('spinBtn').setAttribute('aria-pressed', String(!!S.spin));
+    $('stringsBtn').setAttribute('aria-pressed', String(!!S.showStrings));
     setView(S.view, true);
   }
 
@@ -1781,10 +1839,10 @@
     renderReadout(currentModel);
     renderStepRead(currentModel);
     renderRadiusReadout(currentModel);
+    renderStringReadout(currentModel);
     renderFretTable(currentModel);
     if(S.view==='profile') renderProfile(currentModel);
     update3D(currentModel);
-    save();
   }
 
   function meshVolume(tris){
@@ -1943,6 +2001,18 @@
       `<div><span>Arc facets (STL)</span><b>${p.arcFacets}</b></div>`;
     $('radiusAlert').innerHTML = breach
       ? '<div class="alert">⚠ The radius drops the board edges more than the thinnest point allows. Increase the full height or the radius — the export clamps the curve to keep a solid board.</div>' : '';
+  }
+
+  function renderStringReadout(model){
+    const {margins} = stringLayout(model), mg = margins, tight = v => v < 3;
+    const cell = (label, v) => `<div class="${tight(v)?'warn':''}"><span>${label}</span><b>${L(v)}</b></div>`;
+    $('stringRead').innerHTML =
+      cell('Edge margin at nut · bass', mg.nut.bass) + cell('at nut · treble', mg.nut.treble) +
+      cell('At last fret · bass', mg.last.bass) + cell('at last fret · treble', mg.last.treble);
+    const worst = Math.min(mg.nut.bass, mg.nut.treble, mg.last.bass, mg.last.treble);
+    $('stringAlert').innerHTML = worst < 0
+      ? '<div class="alert">⚠ An outer string runs off the board. Widen the board or reduce the string spacing.</div>'
+      : worst < 3 ? '<div class="alert">⚠ Less than 3 mm of wood outside an outer string — it may slip off the edge when you bend. Widen the board or tighten the spacing.</div>' : '';
   }
 
   function renderFretTable(model){
@@ -2132,6 +2202,29 @@
     G3.dirty = true;
     if(S.view==='profile' && currentModel) renderProfile(currentModel);
   }
+  // Mock strings: tubes at roughly real gauges, 0.5 mm above the step tops at
+  // the nut and rising toward the bridge (about 1.8 mm at the 12th fret). They
+  // stop 40 mm past the heel so the view stays framed on the board.
+  function addStrings3D(model, cx){
+    const p = model.params, {strings} = stringLayout(model);
+    const n = strings.length, low = {6:0.046, 7:0.059, 8:0.074, 9:0.090}[n] || 0.046;
+    const full = p.baseThickness + p.fretHeight, R = p.boardRadius, maxDrop = Math.max(0, p.baseThickness - 0.4);
+    const sag = y => p.radiused ? Math.min(maxDrop, R - Math.sqrt(Math.max(0, R*R - y*y))) : 0;
+    const mat = new THREE.MeshStandardMaterial({color:new THREE.Color(0xd7dbe0).convertSRGBToLinear(), roughness:0.3, metalness:0.9});
+    strings.forEach(st=>{
+      const gauge = low * Math.pow(0.010/low, st.g);                  // inches, geometric from low to high
+      const len = Math.hypot(st.bridge[0]-st.nut[0], st.bridge[1]-st.nut[1]);
+      const toHeel = Math.hypot(st.heel[0]-st.nut[0], st.heel[1]-st.nut[1]);
+      const tEnd = Math.min(1, (toHeel + 40)/len), pts = [];
+      for(let k=0;k<=24;k++){
+        const t = tEnd*k/24, x = st.nut[0] + (st.bridge[0]-st.nut[0])*t, y = st.nut[1] + (st.bridge[1]-st.nut[1])*t;
+        const z = full - sag(y) + 0.5 + 2.6*t + gauge*25.4/2;
+        pts.push(new THREE.Vector3(x - cx, z, -y));
+      }
+      G3.group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, gauge*25.4/2, 8, false), mat.clone()));
+    });
+    mat.dispose();
+  }
   function update3D(model){
     if(!G3.ok) return;
     const tris = model.tris;
@@ -2153,6 +2246,7 @@
     // dispose the old board
     G3.group.children.slice().forEach(c=>{ c.geometry.dispose(); c.material.dispose(); G3.group.remove(c); });
     G3.group.add(mesh); G3.group.add(edges);
+    if(S.showStrings) addStrings3D(model, cx);
     // ground shadow-ish disc
     const len = maxX - minX;
     if(Math.abs(len - G3.size) > len*0.25 || !G3.fitted){ G3.size = len; fit3D(); G3.fitted = true; }
@@ -2224,10 +2318,10 @@
     $('profilePane').classList.toggle('hidden', v!=='profile');
     $('tablePane').classList.toggle('hidden', v!=='table');
     $('spinBtn').classList.toggle('hidden', v!=='3d');
+    $('stringsBtn').classList.toggle('hidden', v!=='3d');
     $('viewResetBtn').classList.toggle('hidden', v!=='3d');
     if(v==='profile' && currentModel) renderProfile(currentModel);
     if(v==='3d') G3.dirty = true;
-    if(!silent) save();
   }
 
   // ================================================================
@@ -2339,6 +2433,7 @@
   $('preset').addEventListener('change', e=>{
     const p = PRESETS[e.target.value]; if(!p) return;
     S.scaleType = p.st;
+    if(p.v.numStrings) [S.vals.eeNut, S.vals.eeBridge] = STRING_SPREAD[p.v.numStrings];
     Object.assign(S.vals, p.v);
     if(p.perp){ S.perpChoice = p.perp; lastPerpN = -1; }
     if(p.radius) S.radiusMode = p.radius;
@@ -2362,7 +2457,8 @@
   $('perpFret').addEventListener('change', e=>{ S.perpChoice = e.target.value; rebuild(); });
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click', ()=>$(b.dataset.help).classList.toggle('hidden')));
-  $('spinBtn').addEventListener('click', ()=>{ S.spin = !S.spin; $('spinBtn').setAttribute('aria-pressed', String(S.spin)); save(); });
+  $('stringsBtn').addEventListener('click', ()=>{ S.showStrings = !S.showStrings; $('stringsBtn').setAttribute('aria-pressed', String(S.showStrings)); if(currentModel) update3D(currentModel); });
+  $('spinBtn').addEventListener('click', ()=>{ S.spin = !S.spin; $('spinBtn').setAttribute('aria-pressed', String(S.spin)); });
   $('viewResetBtn').addEventListener('click', fit3D);
   $('csvBtn').addEventListener('click', ()=>{ if(!currentModel) return; const f = baseName(currentModel)+'-frets.csv'; download(f, fretCSV(currentModel), 'text/csv'); toast('Saved '+f); });
   $('themeBtn').addEventListener('click', ()=>{
