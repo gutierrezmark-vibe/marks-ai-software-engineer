@@ -426,11 +426,12 @@
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </summary>
       <div class="sec-body">
+        <div class="ctl" data-key="numStrings"></div>
         <div class="ctl" data-key="nutWidth"></div>
         <div class="ctl" data-key="heelWidth"></div>
         <button class="help-toggle" data-help="helpTaper">ⓘ About the taper</button>
         <div class="help hidden" id="helpTaper">
-          Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel with single scale for a plain parallel extrusion.
+          <b>Number of strings</b> sets typical nut and heel widths for that many strings (6: 43/57, 7: 48/66, 8: 56/74, 9: 63/82&nbsp;mm); adjust either width afterwards to match your string spacing. Width runs from the nut width at fret 0 to the heel width at the end of the board, centered on the length axis. For multiscale, the treble edge is the back face and the bass edge is the front face; the solid lofts between them. Set nut = heel with single scale for a plain parallel extrusion.
         </div>
       </div>
     </details>
@@ -572,6 +573,8 @@
   const MIN_SCALE_MM = 23 * MM_PER_IN;   // 584.2
   const MAX_SCALE_MM = 31 * MM_PER_IN;   // 787.4
   const MIN_RADIUS_MM = 7.25 * MM_PER_IN; // 184.15
+  // Typical production nut / last-fret widths (mm) by string count; approximate.
+  const STRING_WIDTHS = {6:[43,57], 7:[48,66], 8:[56,74], 9:[63,82]};
   function $(id){ return document.getElementById(id); }
 
   // ================================================================
@@ -587,6 +590,8 @@
                     hint:'Back of the board to the top of a step'},
     fretHeight:    {label:'Step height',           len:true, def:1.0,    min:0.1, max:4,   step:0.05,
                     hint:'How tall each step stands — what the string rests on'},
+    numStrings:    {label:'Number of strings',     len:false,def:6,      min:6,   max:9,   step:1,
+                    hint:'Sets typical nut and heel widths — fine-tune them below', onChange:applyStringWidths},
     nutWidth:      {label:'Nut width',             len:true, def:43,     min:20,  max:90,  step:0.1},
     heelWidth:     {label:'Heel width',            len:true, def:57,     min:20,  max:110, step:0.1},
     boardRadius:   {label:'Radius',                len:true, def:304.8,  min:MIN_RADIUS_MM, max:1000, step:0.1},
@@ -607,15 +612,15 @@
     {id:'cfnylon',  name:'Carbon-fiber nylon (solid)', rho:1.15, color:0x2a2c2f},
   ];
   const PRESETS = [
-    {name:'Fender-style · 25.5″', st:'single', v:{scaleLength:647.7, numFrets:21, nutWidth:42.0, heelWidth:56.0, boardRadius:241.3}},
-    {name:'Gibson-style · 24.75″', st:'single', v:{scaleLength:628.65, numFrets:22, nutWidth:43.0, heelWidth:57.0, boardRadius:304.8}},
-    {name:'PRS-style · 25″', st:'single', v:{scaleLength:635.0, numFrets:24, nutWidth:42.9, heelWidth:56.4, boardRadius:254.0}},
-    {name:'Baritone · 27″', st:'single', v:{scaleLength:685.8, numFrets:24, nutWidth:46.0, heelWidth:58.0, boardRadius:355.6}},
-    {name:'Multiscale · 25.5–27″', st:'multi', perp:'8', v:{trebleScale:647.7, bassScale:685.8, numFrets:24, nutWidth:43.0, heelWidth:57.0, boardRadius:406.4}},
-    {name:'Multiscale 7-string · 25.5–27″', st:'multi', perp:'8', v:{trebleScale:647.7, bassScale:685.8, numFrets:24, nutWidth:48.0, heelWidth:66.0, boardRadius:508.0}},
+    {name:'Fender-style · 25.5″', st:'single', v:{numStrings:6, scaleLength:647.7, numFrets:21, nutWidth:42.0, heelWidth:56.0, boardRadius:241.3}},
+    {name:'Gibson-style · 24.75″', st:'single', v:{numStrings:6, scaleLength:628.65, numFrets:22, nutWidth:43.0, heelWidth:57.0, boardRadius:304.8}},
+    {name:'PRS-style · 25″', st:'single', v:{numStrings:6, scaleLength:635.0, numFrets:24, nutWidth:42.9, heelWidth:56.4, boardRadius:254.0}},
+    {name:'Baritone · 27″', st:'single', v:{numStrings:6, scaleLength:685.8, numFrets:24, nutWidth:46.0, heelWidth:58.0, boardRadius:355.6}},
+    {name:'Multiscale · 25.5–27″', st:'multi', perp:'8', v:{numStrings:6, trebleScale:647.7, bassScale:685.8, numFrets:24, nutWidth:43.0, heelWidth:57.0, boardRadius:406.4}},
+    {name:'Multiscale 7-string · 25.5–27″', st:'multi', perp:'8', v:{numStrings:7, trebleScale:647.7, bassScale:685.8, numFrets:24, nutWidth:48.0, heelWidth:66.0, boardRadius:508.0}},
     // Typical production widths (approximate): nut ~56 / 63 mm, last fret ~74 / 82 mm.
-    {name:'Multiscale 8-string · 26.5–28″', st:'multi', perp:'8', v:{trebleScale:673.1, bassScale:711.2, numFrets:24, nutWidth:56.0, heelWidth:74.0, boardRadius:508.0}},
-    {name:'Multiscale 9-string · 27–30″', st:'multi', perp:'8', v:{trebleScale:685.8, bassScale:762.0, numFrets:24, nutWidth:63.0, heelWidth:82.0, boardRadius:508.0}},
+    {name:'Multiscale 8-string · 26.5–28″', st:'multi', perp:'8', v:{numStrings:8, trebleScale:673.1, bassScale:711.2, numFrets:24, nutWidth:56.0, heelWidth:74.0, boardRadius:508.0}},
+    {name:'Multiscale 9-string · 27–30″', st:'multi', perp:'8', v:{numStrings:9, trebleScale:685.8, bassScale:762.0, numFrets:24, nutWidth:63.0, heelWidth:82.0, boardRadius:508.0}},
   ];
 
   const DEFAULT_STATE = () => ({
@@ -633,6 +638,10 @@
       if(saved.vals.fullHeight == null && saved.vals.baseThickness != null)
         saved.vals.fullHeight = saved.vals.baseThickness + (saved.vals.fretHeight || 1);
       delete saved.vals.baseThickness;
+      // Saves from before the strings control: pick the count whose typical nut width is closest.
+      if(saved.vals.numStrings == null && saved.vals.nutWidth != null)
+        saved.vals.numStrings = +Object.keys(STRING_WIDTHS).reduce((a,b)=>
+          Math.abs(STRING_WIDTHS[b][0]-saved.vals.nutWidth) < Math.abs(STRING_WIDTHS[a][0]-saved.vals.nutWidth) ? b : a);
       S.vals = Object.assign(DEFAULT_STATE().vals, saved.vals);
     }
   }catch(e){}
@@ -798,6 +807,7 @@
     const thinnest = Math.max(0.5, fullHeight - fretHeight);
     return {
       multiscale, numFrets,
+      numStrings: Math.min(9, Math.max(6, Math.round(num(v.numStrings, 6)))),
       perpChoice: multiscale ? (S.perpChoice || 'nut') : 'nut',
       trebleScale: tC.value, bassScale: bC.value,
       trebleClamped: tC.clamped, bassClamped: bC.clamped,
@@ -1002,7 +1012,7 @@
     return [
       p.multiscale ? `Scale: treble ${mm(p.trebleScale)} / bass ${mm(p.bassScale)} mm (perpendicular at ${perp})`
                    : `Scale: ${mm(p.trebleScale)} mm (${inch(p.trebleScale)} in)`,
-      `Frets: ${p.numFrets}    Nut width: ${mm(p.nutWidth)}    Heel width: ${mm(p.heelWidth)}`,
+      `Strings: ${p.numStrings}    Frets: ${p.numFrets}    Nut width: ${mm(p.nutWidth)}    Heel width: ${mm(p.heelWidth)}`,
       `Radius: ${p.radiused ? mm(p.boardRadius)+' mm ('+trimNum(p.boardRadius/MM_PER_IN,2)+' in)' : 'flat'}`,
       `Full height: ${mm(p.baseThickness+p.fretHeight)}    Step height: ${mm(p.fretHeight)}`,
       `Steps: ${p.stepDir==='falling' ? 'ramp down from each fret edge' : 'ramp up to each fret edge (Bond)'}`,
@@ -1667,6 +1677,11 @@
   // ================================================================
   //  CONTROLS
   // ================================================================
+  function applyStringWidths(){
+    const n = Math.min(9, Math.max(6, Math.round(S.vals.numStrings || 6)));
+    [S.vals.nutWidth, S.vals.heelWidth] = STRING_WIDTHS[n];
+    syncControl('nutWidth'); syncControl('heelWidth');
+  }
   function buildControls(){
     document.querySelectorAll('.ctl[data-key]').forEach(el=>{
       const key = el.dataset.key, spec = SPECS[key];
@@ -1680,6 +1695,7 @@
         S.vals[key] = fromDisp(parseFloat(r.value), spec);
         n.value = trimNum(parseFloat(r.value), dispDecimals(spec));
         paintRange(r);
+        if(spec.onChange) spec.onChange();
         schedule();
       });
       n.addEventListener('input', ()=>{
@@ -1687,6 +1703,7 @@
         if(!isFinite(x)) return;
         S.vals[key] = fromDisp(x, spec);
         r.value = x; paintRange(r);
+        if(spec.onChange) spec.onChange();
         schedule();
       });
       n.addEventListener('blur', ()=> syncControl(key));
