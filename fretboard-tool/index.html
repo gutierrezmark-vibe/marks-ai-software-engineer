@@ -576,13 +576,13 @@
   // ================================================================
   const SPECS = {
     scaleLength:   {label:'Scale length',          len:true, def:648,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
-    trebleScale:   {label:'Treble scale (high E)', len:true, def:648,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
-    bassScale:     {label:'Bass scale (low E)',    len:true, def:686,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
+    trebleScale:   {label:'Treble scale (high E)', len:true, def:628.65,   min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
+    bassScale:     {label:'Bass scale (low E)',    len:true, def:660.4,    min:MIN_SCALE_MM, max:MAX_SCALE_MM, step:0.1},
     numFrets:      {label:'Number of frets',       len:false,def:22,     min:1,   max:36,  step:1},
-    overhang:      {label:'Length past last fret', len:true, def:18,     min:0.5, max:80,  step:0.1},
+    overhang:      {label:'Length past last fret', len:true, def:5,      min:0.5, max:80,  step:0.1},
     fullHeight:    {label:'Full height',           len:true, def:6.0,    min:2,   max:15,  step:0.1,
                     hint:'Back of the board to the top of a step'},
-    fretHeight:    {label:'Step height',           len:true, def:1.0,    min:0.1, max:4,   step:0.05,
+    fretHeight:    {label:'Step height',           len:true, def:2.5,    min:0.1, max:4,   step:0.05,
                     hint:'How tall each step stands — what the string rests on'},
     numStrings:    {label:'Number of strings',     len:false,def:6,      min:6,   max:9,   step:1,
                     hint:'Sets typical nut and heel widths — fine-tune them below', onChange:applyStringWidths},
@@ -606,6 +606,7 @@
     {id:'cfnylon',  name:'Carbon-fiber nylon (solid)', rho:1.15, color:0x2a2c2f},
   ];
   const PRESETS = [
+    {name:"Mark's Gibson Drop D · 24.75–26″", st:'multi', perp:'9', radius:'curved', v:{numStrings:6, trebleScale:628.65, bassScale:660.4, numFrets:22, overhang:5, fullHeight:6, fretHeight:2.5, nutWidth:43, heelWidth:57, boardRadius:304.8}},
     {name:'Fender-style · 25.5″', st:'single', v:{numStrings:6, scaleLength:647.7, numFrets:21, nutWidth:42.0, heelWidth:56.0, boardRadius:241.3}},
     {name:'Gibson-style · 24.75″', st:'single', v:{numStrings:6, scaleLength:628.65, numFrets:22, nutWidth:43.0, heelWidth:57.0, boardRadius:304.8}},
     {name:'PRS-style · 25″', st:'single', v:{numStrings:6, scaleLength:635.0, numFrets:24, nutWidth:42.9, heelWidth:56.4, boardRadius:254.0}},
@@ -618,7 +619,8 @@
   ];
 
   const DEFAULT_STATE = () => ({
-    unit:'mm', scaleType:'single', radiusMode:'flat', perpChoice:'nut', stepDir:'rising',
+    // First launch = Mark's Gibson Drop D board (same values as that preset).
+    unit:'mm', scaleType:'multi', radiusMode:'curved', perpChoice:'9', stepDir:'rising',
     wood:'phenolic', spin:true, view:'3d',
     vals: Object.fromEntries(Object.entries(SPECS).map(([k,s])=>[k,s.def])),
   });
@@ -973,13 +975,26 @@
   }
 
   // ---------- top view (dimensioned drawing + tiled 1:1 template) ----------
+  // Half the board width at length position x. The nut and heel widths are held
+  // at the CENTRE of the nut and heel lines (midway between the bass and treble
+  // ends), so a fanned board measures exactly those widths where you'd check
+  // them; the edges stay straight. Unclamped: the curved STEP takes derivatives
+  // a hair past the nut and heel, where a clamp would kink.
+  function boardHalfWidth(m){
+    const p = m.params, tb = m.treble, bs = m.bass;
+    const xNut  = (tb.profile[0].x + bs.profile[0].x)/2;
+    const xHeel = (tb.profile[tb.profile.length-1].x + bs.profile[bs.profile.length-1].x)/2;
+    const span = xHeel - xNut;
+    return x => (p.nutWidth + (p.heelWidth - p.nutWidth)*(span>0 ? (x - xNut)/span : 0))/2;
+  }
+
   // The board seen from above: nut on the left, treble edge at the top. Fret
   // lines are built exactly like the solid's cross sections (x runs bass ->
   // treble, y = -halfW + 2*halfW*f), so the PDFs line up with the STEP.
   function topView(m){
     const p = m.params, tb = m.treble, bs = m.bass;
     const maxX = Math.max(...tb.polygon.map(v=>v.x), ...bs.polygon.map(v=>v.x));
-    const halfW = x => (p.nutWidth + (p.heelWidth - p.nutWidth)*(maxX>0 ? x/maxX : 0))/2;
+    const halfW = boardHalfWidth(m);
     const across = (bx, tx) => Array.from({length:9}, (_,i)=>{
       const f = i/8, x = bx + (tx - bx)*f, hw = halfW(x);
       return [x, -hw + 2*hw*f];
@@ -1210,13 +1225,7 @@
     if(polygonArea2(tp) < 0){ tp.reverse(); bp.reverse(); }
     const n = tp.length;
 
-    const maxX = Math.max(...tp.map(v=>v.x), ...bp.map(v=>v.x));
-    // Unclamped: every real point has 0 <= x <= maxX, and the curved STEP
-    // takes derivatives a hair past the nut and heel, where a clamp would kink.
-    function halfW(x){
-      const t = maxX>0 ? x/maxX : 0;
-      return (p.nutWidth + (p.heelWidth - p.nutWidth)*t) / 2;
-    }
+    const halfW = boardHalfWidth(model);
 
     const R = p.boardRadius;
     // Safety clamp: never let the arc breach the flat bottom. Keep at least
@@ -1761,8 +1770,8 @@
     const treble = edgeModel(p.trebleScale, p, G - perpT);
     const bass   = p.multiscale ? edgeModel(p.bassScale, p, G - perpB) : treble;
     const maxXall = Math.max(...treble.polygon.map(v=>v.x), ...bass.polygon.map(v=>v.x));
-    const widthAtPerp = p.nutWidth + (p.heelWidth - p.nutWidth) * (maxXall>0 ? G/maxXall : 0);
-    currentModel = { treble, bass, multiscale:p.multiscale, params:p, perpX:G, maxXall, widthAtPerp };
+    currentModel = { treble, bass, multiscale:p.multiscale, params:p, perpX:G, maxXall };
+    currentModel.widthAtPerp = 2*boardHalfWidth(currentModel)(G);
     currentModel.tris = loftToSTL(currentModel);
     currentModel.volume = meshVolume(currentModel.tris);
 
@@ -2332,6 +2341,7 @@
     S.scaleType = p.st;
     Object.assign(S.vals, p.v);
     if(p.perp){ S.perpChoice = p.perp; lastPerpN = -1; }
+    if(p.radius) S.radiusMode = p.radius;
     syncModes(); syncAllControls(); rebuild();
     toast('Loaded '+p.name);
     e.target.value = '';
